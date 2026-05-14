@@ -17,7 +17,10 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      return web;
+      throw UnsupportedError(
+        'DefaultFirebaseOptions have not been configured for web - '
+        'you can reconfigure this by running the FlutterFire CLI again.',
+      );
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -25,9 +28,15 @@ class DefaultFirebaseOptions {
       case TargetPlatform.iOS:
         return ios;
       case TargetPlatform.macOS:
-        return macos;
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for macos - '
+          'you can reconfigure this by running the FlutterFire CLI again.',
+        );
       case TargetPlatform.windows:
-        return windows;
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for windows - '
+          'you can reconfigure this by running the FlutterFire CLI again.',
+        );
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -40,49 +49,20 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDe9Xl3Cj2bPkR5nh0vqulJLeHXaCZLWWQ',
-    appId: '1:399866501379:web:879fc78eaa007f7c5a7136',
-    messagingSenderId: '399866501379',
-    projectId: 'cmsc23-final-project-54c2c',
-    authDomain: 'cmsc23-final-project-54c2c.firebaseapp.com',
-    storageBucket: 'cmsc23-final-project-54c2c.firebasestorage.app',
-    measurementId: 'G-XE5Y6DNLW2',
-  );
-
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDe72gR9EcoslUy3JTcbP_HvSqRit5NmKQ',
-    appId: '1:399866501379:android:1c625bfba44253ad5a7136',
-    messagingSenderId: '399866501379',
-    projectId: 'cmsc23-final-project-54c2c',
-    storageBucket: 'cmsc23-final-project-54c2c.firebasestorage.app',
+    apiKey: 'AIzaSyAmJ8l9N3HUudknGFHl3di9M12wQbzWnzw',
+    appId: '1:265738002817:android:fe512947766bcb94c60880',
+    messagingSenderId: '265738002817',
+    projectId: 'elbeats-dev',
+    storageBucket: 'elbeats-dev.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyC5mQbRszkKUVAXjA7255NKhSbrDeqkknU',
-    appId: '1:399866501379:ios:efea83a103d83e895a7136',
-    messagingSenderId: '399866501379',
-    projectId: 'cmsc23-final-project-54c2c',
-    storageBucket: 'cmsc23-final-project-54c2c.firebasestorage.app',
-    iosBundleId: 'com.example.cmsc23Project',
-  );
-
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyC5mQbRszkKUVAXjA7255NKhSbrDeqkknU',
-    appId: '1:399866501379:ios:efea83a103d83e895a7136',
-    messagingSenderId: '399866501379',
-    projectId: 'cmsc23-final-project-54c2c',
-    storageBucket: 'cmsc23-final-project-54c2c.firebasestorage.app',
-    iosBundleId: 'com.example.cmsc23Project',
-  );
-
-  static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyDe9Xl3Cj2bPkR5nh0vqulJLeHXaCZLWWQ',
-    appId: '1:399866501379:web:caf4f50321a7644f5a7136',
-    messagingSenderId: '399866501379',
-    projectId: 'cmsc23-final-project-54c2c',
-    authDomain: 'cmsc23-final-project-54c2c.firebaseapp.com',
-    storageBucket: 'cmsc23-final-project-54c2c.firebasestorage.app',
-    measurementId: 'G-HM8JGEH75F',
+    apiKey: 'AIzaSyADT081hx3ZCUHuesh0RoDaA4CZdNW97XU',
+    appId: '1:265738002817:ios:23215999e37c41edc60880',
+    messagingSenderId: '265738002817',
+    projectId: 'elbeats-dev',
+    storageBucket: 'elbeats-dev.firebasestorage.app',
+    iosBundleId: 'com.example.elbeats',
   );
 }
