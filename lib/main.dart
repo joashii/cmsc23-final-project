@@ -5,11 +5,13 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'provider/auth.provider.dart';
 
-import 'screens/login.dart';
-import 'screens/signup.dart';
+import 'screens/login_signup.dart';
+// import 'screens/signup.dart';
 import 'screens/feed.dart';
 import 'screens/editProfile.dart';
 import 'screens/addPost.dart';
+
+import 'theme/colors.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,10 +38,16 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Elbeats Food Sharing',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(useMaterial3: true, colorScheme: AppColors.lightScheme),
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        colorScheme: AppColors.darkScheme,
+      ),
+      themeMode: ThemeMode.system,
       initialRoute: '/',
       routes: {
-        '/login': (context) => const LoginPage(),
-        '/signup': (context) => const SignupPage(),
+        '/login': (context) => const AuthScreen(),
         '/feed': (context) => const FoodFeedPage(),
         '/post-item': (context) => const PostItemPage(),
         '/profile': (context) => const ProfilePage(),
@@ -65,7 +73,7 @@ class AuthWrapper extends StatelessWidget {
         } else if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         } else if (!snapshot.hasData) {
-          return const LoginPage();
+          return const AuthScreen();
         } else {
           // If logged in, show the feed
           return const FoodFeedPage();
