@@ -5,7 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'provider/auth.provider.dart';
 
-import 'screens/login_signup.dart';
+import 'screens/auth_screen.dart';
 // import 'screens/signup.dart';
 import 'screens/feed.dart';
 import 'screens/editProfile.dart';

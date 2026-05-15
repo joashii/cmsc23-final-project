@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:elbeats/screens/account-creation/profile_setup.dart';
 
 class InterestTagsScreen extends StatefulWidget {
   const InterestTagsScreen({super.key});
@@ -10,15 +11,14 @@ class InterestTagsScreen extends StatefulWidget {
 class _InterestTagsScreenState extends State<InterestTagsScreen> {
   // Typical food categories for a sharing app
   final List<String> _categories = [
+    'Vegan',
+    'Homecooked',
     'Vegetables',
     'Fruits',
-    'Cooked Meals',
-    'Baked Goods',
     'Canned Items',
-    'Pantry Staples',
-    'Dairy & Eggs',
-    'Beverages',
     'Snacks',
+    'Dairy and Eggs',
+    'Halal',
   ];
 
   final Set<String> _selectedTags = {};
@@ -85,15 +85,23 @@ class _InterestTagsScreenState extends State<InterestTagsScreen> {
             // Navigation Button
             SizedBox(
               width: double.infinity,
-              height: 50,
               child: FilledButton(
+                // 1. Logic to disable the button if no tags are selected
                 onPressed: _selectedTags.isEmpty
-                    ? null // Disable button until at least one tag is picked
+                    ? null
                     : () {
-                        // TODO: Navigate to Role Selection Screen
-                        print("Selected Tags: $_selectedTags");
+                        // 2. Optional: Save the data to your Provider before navigating
+                        // context.read<UserAuthProvider>().setInterests(_selectedTags.toList());
+
+                        // 3. Navigate to the Role & Location screen
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ProfileSetupScreen(),
+                          ),
+                        );
                       },
-                child: const Text("Next"),
+                child: const Text("Continue"),
               ),
             ),
             const SizedBox(height: 20),

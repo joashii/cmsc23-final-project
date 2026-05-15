@@ -143,7 +143,18 @@ class _SignupFormState extends State<SignupForm> {
                         );
                       }
                     } catch (e) {
-                      // Handle errors...
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              e.toString(),
+                            ), // This will show you exactly why it's failing
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.error,
+                          ),
+                        );
+                      }
                     }
                   }
                 },
