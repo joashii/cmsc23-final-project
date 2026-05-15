@@ -1,31 +1,57 @@
+import 'package:cmsc23_project/screens/selfie_verification_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+
 import 'api/firebase_todo_api.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
-    FirebaseTodoAPI api = FirebaseTodoAPI();
+    return const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: HomeScreen(),
+    );
+  }
+}
 
-    api.addTodo({
-      "title": "Todo from Flutter",
-      "completed": false,
-      "id": "user_id",
-    });
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
 
-    return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(title: Text("Firebase Setup")),
-        body: Center(child: Text("Firebase is working")),
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Selfie Verification Test")),
+
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton.icon(
+              icon: const Icon(Icons.verified_user),
+              label: const Text("Selfie Verification"),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const SelfieVerificationScreen(),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
