@@ -109,8 +109,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) =>
-                                const IdentityVerificationScreen(),
+                            builder: (_) => const IdentityVerificationScreen(),
                           ),
                         );
                       },

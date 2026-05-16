@@ -1,7 +1,11 @@
 import 'dart:io';
+import 'package:camera/camera.dart';
+import 'package:elbeats/provider/auth.provider.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
+// import 'package:image_picker/image_picker.dart';
 import 'package:elbeats/screens/feed.dart';
+import 'package:elbeats/components/selfie_verification.dart';
+import 'package:provider/provider.dart';
 
 class IdentityVerificationScreen extends StatefulWidget {
   const IdentityVerificationScreen({super.key});
@@ -14,12 +18,12 @@ class IdentityVerificationScreen extends StatefulWidget {
 class _IdentityVerificationScreenState
     extends State<IdentityVerificationScreen> {
   File? _image;
-  final ImagePicker _picker = ImagePicker();
+  // final ImagePicker _picker = ImagePicker();
 
-  Future<void> _takePhoto() async {
-    final XFile? photo = await _picker.pickImage(source: ImageSource.camera);
-    if (photo != null) setState(() => _image = File(photo.path));
-  }
+  // Future<void> _takePhoto() async {
+  //   final XFile? photo = await _picker.pickImage(source: ImageSource.camera);
+  //   if (photo != null) setState(() => _image = File(photo.path));
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -61,7 +65,22 @@ class _IdentityVerificationScreenState
 
               const SizedBox(height: 32),
               ElevatedButton.icon(
-                onPressed: _takePhoto,
+                onPressed: () async {
+                  // 1. Wait for the user to finish in the camera screen
+                  final XFile? result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const SelfieVerification(),
+                    ),
+                  );
+
+                  // 2. If we got an image back, update the state
+                  if (result != null) {
+                    setState(() {
+                      _image = File(result.path);
+                    });
+                  }
+                },
                 icon: const Icon(Icons.camera),
                 label: const Text("Open Camera"),
               ),
@@ -71,6 +90,10 @@ class _IdentityVerificationScreenState
                     ? null
                     : () {
                         // Finish and go to Feed (where the Notification Modal will trigger)
+                        Provider.of<UserAuthProvider>(
+                          context,
+                          listen: false,
+                        ).setNewRegistration(true);
                         Navigator.pushAndRemoveUntil(
                           context,
                           MaterialPageRoute(

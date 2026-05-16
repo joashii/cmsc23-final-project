@@ -1,4 +1,4 @@
-import 'package:cmsc23_project/screens/selfie_verification_screen.dart';
+import 'package:elbeats/components/main_navigation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -9,7 +9,7 @@ import 'provider/auth.provider.dart';
 import 'screens/auth_screen.dart';
 // import 'screens/signup.dart';
 import 'screens/feed.dart';
-import 'screens/editProfile.dart';
+import 'screens/user_profile.dart';
 import 'screens/addPost.dart';
 
 import 'theme/colors.dart';
@@ -48,6 +48,7 @@ class MyApp extends StatelessWidget {
       themeMode: ThemeMode.system,
       initialRoute: '/',
       routes: {
+        '/main': (context) => const MainNav(),
         '/login': (context) => const AuthScreen(),
         '/feed': (context) => const FoodFeedPage(),
         '/post-item': (context) => const PostItemPage(),
@@ -77,40 +78,9 @@ class AuthWrapper extends StatelessWidget {
           return const AuthScreen();
         } else {
           // If logged in, show the feed
-          return const FoodFeedPage();
+          return const MainNav();
         }
       },
-    );
-  }
-}
-
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Selfie Verification Test")),
-
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            ElevatedButton.icon(
-              icon: const Icon(Icons.verified_user),
-              label: const Text("Selfie Verification"),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const SelfieVerificationScreen(),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
