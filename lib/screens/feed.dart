@@ -97,29 +97,50 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
         stream: FirebasePantryAPI().getAllItems(),
         builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
           if (snapshot.hasError) {
-            return const Center(child: Text("Error loading feed"));
+            // PRO-TIP: Printing the actual error to your terminal console
+            // stops you from guessing why the stream failed.
+            debugPrint("Firestore Stream Error: ${snapshot.error}");
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text("Error loading feed: ${snapshot.error}"),
+              ),
+            );
           }
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(child: Text("No food items listed yet!"));
+          }
+
           return ListView.builder(
-            itemCount: snapshot.data?.docs.length ?? 0,
+            itemCount: snapshot.data!.docs.length,
             itemBuilder: (context, index) {
               Map<String, dynamic> data =
                   snapshot.data!.docs[index].data() as Map<String, dynamic>;
 
-              Timestamp expiryTimestamp = data['expirationDate'];
-              DateTime expiryDate = expiryTimestamp.toDate();
+              // ─── NULL-SAFE PARSING FOR TIMESTAMPS ───
+              Timestamp? expiryTimestamp = data['expirationDate'] as Timestamp?;
+              DateTime expiryDate = expiryTimestamp != null
+                  ? expiryTimestamp.toDate()
+                  : DateTime.now().add(
+                      const Duration(days: 3),
+                    ); // 3-day fallback
+
               String formattedDate =
                   "${expiryDate.year}-${expiryDate.month}-${expiryDate.day}";
 
+              // ─── DEFENSIVE BACKUPS FOR OTHER FIELDS ───
+              String itemName = data['name'] ?? 'Unnamed Item';
+              var quantity = data['quantity'] ?? 1;
+              String itemStatus = data['status'] ?? 'Available';
+
               return ListTile(
-                title: Text(data['name']),
-                subtitle: Text(
-                  "Qty: ${data['quantity']} | Expires: $formattedDate",
-                ),
-                trailing: data['status'] == 'Available'
+                title: Text(itemName),
+                subtitle: Text("Qty: $quantity | Expires: $formattedDate"),
+                trailing: itemStatus == 'Available'
                     ? ElevatedButton(
                         onPressed: () async {
                           String docId = snapshot.data!.docs[index].id;
