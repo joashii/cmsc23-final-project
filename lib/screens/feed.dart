@@ -93,81 +93,193 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
           ],
         ),
       ),
-      body: StreamBuilder(
-        stream: FirebasePantryAPI().getAllItems(),
-        builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
-          if (snapshot.hasError) {
-            // PRO-TIP: Printing the actual error to your terminal console
-            // stops you from guessing why the stream failed.
-            debugPrint("Firestore Stream Error: ${snapshot.error}");
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text("Error loading feed: ${snapshot.error}"),
-              ),
-            );
-          }
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Location header section
+              _buildHeader(),
+              const SizedBox(height: 20),
 
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text("No food items listed yet!"));
-          }
+              // Search bar for food cravings/search queries
+              _buildSearchBar(),
+              const SizedBox(height: 20),
 
-          return ListView.builder(
-            itemCount: snapshot.data!.docs.length,
-            itemBuilder: (context, index) {
-              Map<String, dynamic> data =
-                  snapshot.data!.docs[index].data() as Map<String, dynamic>;
+              // Horizontal food category filters
+              _buildCategoryChips(),
+              const SizedBox(height: 20),
 
-              // ─── NULL-SAFE PARSING FOR TIMESTAMPS ───
-              Timestamp? expiryTimestamp = data['expirationDate'] as Timestamp?;
-              DateTime expiryDate = expiryTimestamp != null
-                  ? expiryTimestamp.toDate()
-                  : DateTime.now().add(
-                      const Duration(days: 3),
-                    ); // 3-day fallback
+              // Suggested recipes based on pantry items
+              _buildRecipeSection(),
+              const SizedBox(height: 20),
 
-              String formattedDate =
-                  "${expiryDate.year}-${expiryDate.month}-${expiryDate.day}";
-
-              // ─── DEFENSIVE BACKUPS FOR OTHER FIELDS ───
-              String itemName = data['name'] ?? 'Unnamed Item';
-              var quantity = data['quantity'] ?? 1;
-              String itemStatus = data['status'] ?? 'Available';
-
-              return ListTile(
-                title: Text(itemName),
-                subtitle: Text("Qty: $quantity | Expires: $formattedDate"),
-                trailing: itemStatus == 'Available'
-                    ? ElevatedButton(
-                        onPressed: () async {
-                          String docId = snapshot.data!.docs[index].id;
-                          await FirebasePantryAPI().updateItemStatus(
-                            docId,
-                            "Reserved",
-                          );
-                        },
-                        child: const Text("Request"),
-                      )
-                    : const Text(
-                        "Reserved",
-                        style: TextStyle(color: Colors.orange),
-                      ),
-                onLongPress: () async {
-                  String docId = snapshot.data!.docs[index].id;
-                  await FirebasePantryAPI().deleteFoodItem(docId);
-                },
-              );
-            },
-          );
-        },
+              // Community food listings from Firestore
+              _buildCommunitySection(),
+            ],
+          ),
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         child: const Icon(Icons.add),
         onPressed: () => Navigator.pushNamed(context, '/post-item'),
       ),
+    );
+  }
+
+  // Displays user's current location and favorites button
+  Widget _buildHeader() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Text(
+              "SEARCHING FROM",
+              style: TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+            Text(
+              "Los Banos, Laguna",
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        IconButton(onPressed: () {}, icon: const Icon(Icons.favorite_border)),
+      ],
+    );
+  }
+
+  // Search input for food items or cravings
+  Widget _buildSearchBar() {
+    return TextField(
+      decoration: InputDecoration(
+        hintText: "Craving anything?",
+        prefixIcon: const Icon(Icons.search),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+      ),
+    );
+  }
+
+  // Horizontal list of food categories
+  Widget _buildCategoryChips() {
+    final categories = ["Vegetables", "Rice Meals", "Bread", "Fruits"];
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: categories.map((category) {
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Chip(label: Text(category)),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  // Displays recommended recipes section
+  Widget _buildRecipeSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Based on Today's Pantry",
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 180,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: 4,
+            itemBuilder: (context, index) {
+              return Container(
+                width: 140,
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade100,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Center(child: Text("Recipe ${index + 1}")),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Fetches and displays community food posts from Firestore
+  Widget _buildCommunitySection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "What the Community has to offer",
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+
+        StreamBuilder(
+          stream: FirebasePantryAPI().getAllItems(),
+          builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
+            if (snapshot.hasError) {
+              return Text("Error: ${snapshot.error}");
+            }
+
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (snapshot.data!.docs.isEmpty) {
+              return const Text("No food items available.");
+            }
+
+            return Column(
+              children: snapshot.data!.docs.map((doc) {
+                Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+
+                String itemName = data['name'] ?? "Unnamed Item";
+                var quantity = data['quantity'] ?? 1;
+                String itemStatus = data['status'] ?? "Available";
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: ListTile(
+                    leading: const Icon(Icons.fastfood),
+                    title: Text(itemName),
+                    subtitle: Text("Qty: $quantity"),
+
+                    trailing: itemStatus == "Available"
+                        ? ElevatedButton(
+                            onPressed: () async {
+                              await FirebasePantryAPI().updateItemStatus(
+                                doc.id,
+                                "Reserved",
+                              );
+                            },
+                            child: const Text("Request"),
+                          )
+                        : const Text(
+                            "Reserved",
+                            style: TextStyle(color: Colors.orange),
+                          ),
+
+                    onLongPress: () async {
+                      await FirebasePantryAPI().deleteFoodItem(doc.id);
+                    },
+                  ),
+                );
+              }).toList(),
+            );
+          },
+        ),
+      ],
     );
   }
 }

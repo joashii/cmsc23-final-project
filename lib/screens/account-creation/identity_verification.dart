@@ -7,6 +7,8 @@ import 'package:elbeats/screens/feed.dart';
 import 'package:elbeats/components/selfie_verification.dart';
 import 'package:provider/provider.dart';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class IdentityVerificationScreen extends StatefulWidget {
   const IdentityVerificationScreen({super.key});
 
@@ -88,19 +90,43 @@ class _IdentityVerificationScreenState
               FilledButton(
                 onPressed: _image == null
                     ? null
-                    : () {
-                        // Finish and go to Feed (where the Notification Modal will trigger)
-                        Provider.of<UserAuthProvider>(
+                    : () async {
+                        final user = Provider.of<UserAuthProvider>(
                           context,
                           listen: false,
-                        ).setNewRegistration(true);
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const FoodFeedPage(),
-                          ),
-                          (route) => false, // Clears navigation stack
-                        );
+                        ).currentUser;
+
+                        // Save authenticated user's profile data to Firestore
+                        // Uses Firebase Auth UID as document ID for easier lookup
+                        try {
+                          if (user != null) {
+                            await FirebaseFirestore.instance
+                                .collection("users")
+                                .doc(user.uid)
+                                .set({
+                                  "email": user.email,
+                                  "verified": true,
+                                  "createdAt": FieldValue.serverTimestamp(),
+                                });
+                          }
+
+                          Provider.of<UserAuthProvider>(
+                            context,
+                            listen: false,
+                          ).setNewRegistration(true);
+
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const FoodFeedPage(),
+                            ),
+                            (route) => false,
+                          );
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("Registration failed: $e")),
+                          );
+                        }
                       },
                 child: const Text("Finalize Registration"),
               ),
