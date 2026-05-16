@@ -4,6 +4,8 @@ import 'package:elbeats/api/pantry.api.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'dart:convert';
+
 class PostItemPage extends StatefulWidget {
   final String postType;
   const PostItemPage({super.key, required this.postType});
@@ -52,8 +54,11 @@ class _PostItemPageState extends State<PostItemPage> {
   Future<void> _pickImage(ImageSource source) async {
     final XFile? pickedFile = await _picker.pickImage(
       source: source,
-      imageQuality: 80,
+      imageQuality: 10,
+      maxWidth: 500,
+      maxHeight: 500,
     );
+
     if (pickedFile != null) {
       setState(() {
         _selectedImage = File(pickedFile.path);
@@ -87,6 +92,20 @@ class _PostItemPageState extends State<PostItemPage> {
         ),
       ),
     );
+  }
+
+  Future<String?> convertImageToBase64(File imageFile) async {
+    try {
+      List<int> imageBytes = await imageFile.readAsBytes();
+
+      print("Image size in bytes: ${imageBytes.length}");
+
+      String base64Image = base64Encode(imageBytes);
+      return base64Image;
+    } catch (e) {
+      debugPrint("Base64 conversion failed: $e");
+      return null;
+    }
   }
 
   @override
@@ -339,8 +358,22 @@ class _PostItemPageState extends State<PostItemPage> {
                     if (_formKey.currentState!.validate() &&
                         _selectedImage != null) {
                       try {
+                        final base64Image = await convertImageToBase64(
+                          _selectedImage!,
+                        );
+
+                        if (base64Image == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("Image conversion failed"),
+                            ),
+                          );
+                          return;
+                        }
+
+                        // Save post data to Firestore
                         final Map<String, dynamic> newFoodItem = {
-                          'postType': widget.postType, //'PANTRY' or 'REQUEST'
+                          'postType': widget.postType,
                           'name': _nameController.text.trim(),
                           'description': _descriptionController.text.trim(),
                           'shelfLife': _selectedShelfLife,
@@ -349,6 +382,7 @@ class _PostItemPageState extends State<PostItemPage> {
                           'setupMethod': _preferredSetup,
                           'status': 'Available',
                           'createdAt': Timestamp.now(),
+                          'imageBase64': base64Image,
                         };
 
                         await FirebasePantryAPI().addFoodItem(newFoodItem);
@@ -357,10 +391,11 @@ class _PostItemPageState extends State<PostItemPage> {
                           Navigator.pop(context);
                         }
                       } catch (e) {
-                        // Error handling SnackBar...
+                        debugPrint("Error posting: $e");
                       }
                     }
                   },
+
                   child: Text(
                     isPantry
                         ? "Post to Community Pantry"

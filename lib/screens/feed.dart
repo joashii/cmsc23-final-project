@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../api/pantry.api.dart';
 import '../provider/auth.provider.dart';
 
+import 'dart:convert';
+
 class FoodFeedPage extends StatefulWidget {
   const FoodFeedPage({super.key});
 
@@ -251,7 +253,17 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: ListTile(
-                    leading: const Icon(Icons.fastfood),
+                    leading: data["imageBase64"] != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.memory(
+                              base64Decode(data["imageBase64"]),
+                              width: 50,
+                              height: 50,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : const Icon(Icons.fastfood),
                     title: Text(itemName),
                     subtitle: Text("Qty: $quantity"),
 
