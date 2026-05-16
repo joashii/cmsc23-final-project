@@ -1,4 +1,5 @@
 import 'package:elbeats/screens/feed.dart';
+import 'package:elbeats/screens/user_inbox.dart';
 import 'package:elbeats/screens/user_profile.dart';
 import 'package:flutter/material.dart';
 
@@ -16,7 +17,7 @@ class _MainNavState extends State<MainNav> {
   final List<Widget> _pages = [
     const FoodFeedPage(), // Index 0
     const SizedBox.shrink(), // Index 1 (Placeholder for the "Add" button)
-    // const NotificationsPage(), // Index 2
+    const NotificationsPage(), // Index 2
     const ProfilePage(), // Index 3
   ];
 
