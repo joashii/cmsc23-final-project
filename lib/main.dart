@@ -10,7 +10,7 @@ import 'screens/auth_screen.dart';
 // import 'screens/signup.dart';
 import 'screens/feed.dart';
 import 'screens/user_profile.dart';
-import 'screens/addPost.dart';
+import 'screens/user-posts/post_item_page.dart';
 
 import 'theme/colors.dart';
 
@@ -51,7 +51,8 @@ class MyApp extends StatelessWidget {
         '/main': (context) => const MainNav(),
         '/login': (context) => const AuthScreen(),
         '/feed': (context) => const FoodFeedPage(),
-        '/post-item': (context) => const PostItemPage(),
+        '/post-item': (context) => const PostItemPage(postType: 'PANTRY'),
+        '/make-request': (context) => const PostItemPage(postType: 'REQUEST'),
         '/profile': (context) => const ProfilePage(),
       },
       home: const AuthWrapper(),
