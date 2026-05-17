@@ -48,8 +48,10 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             actions: [
               IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.menu_rounded),
+                onPressed: () async {
+                  await context.read<UserAuthProvider>().signOut();
+                },
+                icon: const Icon(Icons.logout_rounded),
                 color: colorScheme.onSurface,
               ),
             ],

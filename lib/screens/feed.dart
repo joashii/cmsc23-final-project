@@ -70,60 +70,30 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Community Pantry")),
+      appBar: null,
 
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            const DrawerHeader(
-              decoration: BoxDecoration(color: Colors.green),
-              child: Text(
-                "Elbeats Menu",
-                style: TextStyle(color: Colors.white, fontSize: 24),
-              ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(),
+                const SizedBox(height: 20),
+
+                _buildSearchBar(),
+                const SizedBox(height: 20),
+
+                _buildCategoryChips(),
+                const SizedBox(height: 20),
+
+                _buildRecipeSection(),
+                const SizedBox(height: 20),
+
+                _buildCommunitySection(),
+              ],
             ),
-
-            ListTile(
-              leading: const Icon(Icons.person),
-              title: const Text("View & Edit Profile"),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, "/profile");
-              },
-            ),
-
-            ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text("Logout"),
-              onTap: () {
-                context.read<UserAuthProvider>().signOut();
-              },
-            ),
-          ],
-        ),
-      ),
-
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(),
-              const SizedBox(height: 20),
-
-              _buildSearchBar(),
-              const SizedBox(height: 20),
-
-              _buildCategoryChips(),
-              const SizedBox(height: 20),
-
-              _buildRecipeSection(),
-              const SizedBox(height: 20),
-
-              _buildCommunitySection(),
-            ],
           ),
         ),
       ),
