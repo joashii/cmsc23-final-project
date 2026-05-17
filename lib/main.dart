@@ -16,10 +16,16 @@ import 'theme/colors.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (Firebase.apps.isEmpty) {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+  try {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
+  } catch (e) {
+    // Firebase failed to initialize.
+    // App will still launch; auth-dependent features will be unavailable.
+    debugPrint('Firebase initialization failed: $e');
   }
 
   runApp(
@@ -64,23 +70,7 @@ class AuthWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Listen to user authentication status
-    final userStream = context.watch<UserAuthProvider>().userStream;
-
-    return StreamBuilder(
-      stream: userStream,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(child: Text("Error: ${snapshot.error}"));
-        } else if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (!snapshot.hasData) {
-          return const AuthScreen();
-        } else {
-          // If logged in, show the feed
-          return const MainNav();
-        }
-      },
-    );
+    // Skip login/signup
+    return const ProfilePage();
   }
 }

@@ -19,6 +19,14 @@ class FirebasePantryAPI {
     return db.collection("food_items").snapshots();
   }
 
+  // Get a real-time stream of items owned by a specific user
+  Stream<QuerySnapshot> getUserItems(String ownerId) {
+    return db
+        .collection("food_items")
+        .where("ownerId", isEqualTo: ownerId)
+        .snapshots();
+  }
+
   // Delete an existing item
   Future<void> deleteFoodItem(String docId) async {
     try {
