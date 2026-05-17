@@ -1,10 +1,12 @@
-import 'package:flutter/material.dart';
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../api/pantry.api.dart';
 import '../provider/auth.provider.dart';
-
-import 'dart:convert';
 
 class FoodFeedPage extends StatefulWidget {
   const FoodFeedPage({super.key});
@@ -20,6 +22,7 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final auth = context.read<UserAuthProvider>();
+
       if (auth.isNewRegistration) {
         _showNotificationModal();
         auth.setNewRegistration(false);
@@ -40,17 +43,19 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
         ),
         title: const Text("Stay Updated"),
         content: const Text(
-          "Would you like to receive alerts when new food is shared in your area? "
-          "You can change this anytime in settings.",
+          "Would you like to receive alerts when new food is shared in your area?",
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              Navigator.pop(context);
+            },
             child: const Text("Maybe Later"),
           ),
           FilledButton(
             onPressed: () {
               Navigator.pop(context);
+
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text("Notifications Enabled!")),
               );
@@ -66,6 +71,7 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Community Pantry")),
+
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
@@ -73,21 +79,23 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
             const DrawerHeader(
               decoration: BoxDecoration(color: Colors.green),
               child: Text(
-                'Elbeats Menu',
+                "Elbeats Menu",
                 style: TextStyle(color: Colors.white, fontSize: 24),
               ),
             ),
+
             ListTile(
               leading: const Icon(Icons.person),
-              title: const Text('View & Edit Profile'),
+              title: const Text("View & Edit Profile"),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.pushNamed(context, '/profile');
+                Navigator.pushNamed(context, "/profile");
               },
             ),
+
             ListTile(
               leading: const Icon(Icons.logout),
-              title: const Text('Logout'),
+              title: const Text("Logout"),
               onTap: () {
                 context.read<UserAuthProvider>().signOut();
               },
@@ -95,42 +103,33 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
           ],
         ),
       ),
+
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Location header section
               _buildHeader(),
               const SizedBox(height: 20),
 
-              // Search bar for food cravings/search queries
               _buildSearchBar(),
               const SizedBox(height: 20),
 
-              // Horizontal food category filters
               _buildCategoryChips(),
               const SizedBox(height: 20),
 
-              // Suggested recipes based on pantry items
               _buildRecipeSection(),
               const SizedBox(height: 20),
 
-              // Community food listings from Firestore
               _buildCommunitySection(),
             ],
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        child: const Icon(Icons.add),
-        onPressed: () => Navigator.pushNamed(context, '/post-item'),
-      ),
     );
   }
 
-  // Displays user's current location and favorites button
   Widget _buildHeader() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -153,7 +152,6 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
     );
   }
 
-  // Search input for food items or cravings
   Widget _buildSearchBar() {
     return TextField(
       decoration: InputDecoration(
@@ -164,9 +162,14 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
     );
   }
 
-  // Horizontal list of food categories
   Widget _buildCategoryChips() {
-    final categories = ["Vegetables", "Rice Meals", "Bread", "Fruits"];
+    final categories = [
+      "Fruits & Vegetables",
+      "Cooked Meals",
+      "Baked Goods",
+      "Canned & Pantry",
+      "Dairy & Eggs",
+    ];
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -174,14 +177,15 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
         children: categories.map((category) {
           return Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: Chip(label: Text(category)),
+            child: Chip(
+              label: Text(category, style: const TextStyle(fontSize: 13)),
+            ),
           );
         }).toList(),
       ),
     );
   }
 
-  // Displays recommended recipes section
   Widget _buildRecipeSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -190,9 +194,11 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
           "Based on Today's Pantry",
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
+
         const SizedBox(height: 10),
+
         SizedBox(
-          height: 180,
+          height: 210,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: 4,
@@ -213,7 +219,6 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
     );
   }
 
-  // Fetches and displays community food posts from Firestore
   Widget _buildCommunitySection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -222,11 +227,12 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
           "What the Community has to offer",
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
+
         const SizedBox(height: 12),
 
-        StreamBuilder(
+        StreamBuilder<QuerySnapshot>(
           stream: FirebasePantryAPI().getAllItems(),
-          builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
+          builder: (context, snapshot) {
             if (snapshot.hasError) {
               return Text("Error: ${snapshot.error}");
             }
@@ -243,48 +249,164 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
               children: snapshot.data!.docs.map((doc) {
                 Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
 
+                final currentUserId = FirebaseAuth.instance.currentUser!.uid;
+
+                final ownerId = data['ownerId'] ?? "";
+                final requesterId = data['requestedBy'] ?? "";
+                final bool isOwner = currentUserId == ownerId;
+
                 String itemName = data['name'] ?? "Unnamed Item";
-                var quantity = data['quantity'] ?? 1;
                 String itemStatus = data['status'] ?? "Available";
 
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  height: 180,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 5,
+                        spreadRadius: 1,
+                        offset: const Offset(0, 0),
+                      ),
+                    ],
                   ),
-                  child: ListTile(
-                    leading: data["imageBase64"] != null
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.memory(
-                              base64Decode(data["imageBase64"]),
-                              width: 50,
-                              height: 50,
-                              fit: BoxFit.cover,
-                            ),
-                          )
-                        : const Icon(Icons.fastfood),
-                    title: Text(itemName),
-                    subtitle: Text("Qty: $quantity"),
 
-                    trailing: itemStatus == "Available"
-                        ? ElevatedButton(
-                            onPressed: () async {
-                              await FirebasePantryAPI().updateItemStatus(
-                                doc.id,
-                                "Reserved",
-                              );
-                            },
-                            child: const Text("Request"),
-                          )
-                        : const Text(
-                            "Reserved",
-                            style: TextStyle(color: Colors.orange),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 6,
+                        child: ClipRRect(
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(20),
+                            bottomLeft: Radius.circular(20),
                           ),
+                          child: data["imageBase64"] != null
+                              ? Image.memory(
+                                  base64Decode(data["imageBase64"]),
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                )
+                              : Container(
+                                  color: Colors.grey.shade300,
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.fastfood,
+                                      size: 50,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                        ),
+                      ),
 
-                    onLongPress: () async {
-                      await FirebasePantryAPI().deleteFoodItem(doc.id);
-                    },
+                      Expanded(
+                        flex: 4,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                data['postType'] ?? "PANTRY ITEM",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+
+                              const SizedBox(height: 8),
+
+                              Text(
+                                itemName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+
+                              const SizedBox(height: 4),
+
+                              Text(
+                                data['shelfLife'] ?? "Fresh",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+
+                              const Spacer(),
+
+                              if (isOwner && itemStatus == "Available")
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                    ),
+                                    onPressed: () async {
+                                      await FirebasePantryAPI().deleteFoodItem(
+                                        doc.id,
+                                      );
+                                    },
+                                    child: const Text("Cancel Post"),
+                                  ),
+                                )
+                              else if (!isOwner && itemStatus == "Available")
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    onPressed: () async {
+                                      await FirebaseFirestore.instance
+                                          .collection("food_items")
+                                          .doc(doc.id)
+                                          .update({
+                                            "status": "Pending",
+                                            "requestedBy": currentUserId,
+                                          });
+                                    },
+                                    child: const Text("Request"),
+                                  ),
+                                )
+                              else if (isOwner && itemStatus == "Pending")
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    onPressed: () async {
+                                      await FirebasePantryAPI()
+                                          .updateItemStatus(doc.id, "Reserved");
+                                    },
+                                    child: const Text("Accept Request"),
+                                  ),
+                                )
+                              else if (!isOwner &&
+                                  itemStatus == "Pending" &&
+                                  requesterId == currentUserId)
+                                const Text(
+                                  "Waiting for owner approval",
+                                  style: TextStyle(
+                                    color: Colors.orange,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )
+                              else if (itemStatus == "Reserved")
+                                const Text(
+                                  "Reserved",
+                                  style: TextStyle(
+                                    color: Colors.green,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 );
               }).toList(),

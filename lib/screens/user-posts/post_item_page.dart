@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class PostItemPage extends StatefulWidget {
   final String postType;
@@ -371,6 +372,8 @@ class _PostItemPageState extends State<PostItemPage> {
                           return;
                         }
 
+                        final user = FirebaseAuth.instance.currentUser;
+
                         // Save post data to Firestore
                         final Map<String, dynamic> newFoodItem = {
                           'postType': widget.postType,
@@ -383,6 +386,9 @@ class _PostItemPageState extends State<PostItemPage> {
                           'status': 'Available',
                           'createdAt': Timestamp.now(),
                           'imageBase64': base64Image,
+
+                          'ownerId': user?.uid, // who posted it
+                          'requestedBy': null, // who requested it
                         };
 
                         await FirebasePantryAPI().addFoodItem(newFoodItem);

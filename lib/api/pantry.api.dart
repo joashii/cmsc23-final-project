@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 class FirebasePantryAPI {
   static final FirebaseFirestore db = FirebaseFirestore.instance;
 
-  // Add a new food item 
+  // Add a new food item
   Future<void> addFoodItem(Map<String, dynamic> item) async {
     await db.collection("food_items").add(item);
   }
@@ -27,5 +27,23 @@ class FirebasePantryAPI {
     } catch (e) {
       debugPrint("Error deleting: $e");
     }
+  }
+
+  Future<void> requestItem(String docId, String userId) async {
+    await db.collection("food_items").doc(docId).update({
+      "status": "Pending",
+      "requestedBy": userId,
+    });
+  }
+
+  Future<void> acceptRequest(String docId) async {
+    await db.collection("food_items").doc(docId).update({"status": "Reserved"});
+  }
+
+  Stream<QuerySnapshot> getUserItems(String userId) {
+    return db
+        .collection("food_items")
+        .where("ownerId", isEqualTo: userId)
+        .snapshots();
   }
 }
