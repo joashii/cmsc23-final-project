@@ -32,7 +32,7 @@ class FirebasePantryAPI {
   Future<void> requestItem(String docId, String userId) async {
     await db.collection("food_items").doc(docId).update({
       "status": "Pending",
-      "requestedBy": userId,
+      "requestedBy": FieldValue.arrayUnion([userId]),
     });
   }
 
@@ -41,9 +41,19 @@ class FirebasePantryAPI {
   }
 
   Stream<QuerySnapshot> getUserItems(String userId) {
-    return db
-        .collection("food_items")
-        .where("ownerId", isEqualTo: userId)
+    return FirebaseFirestore.instance
+        .collection('food_items')
+        .where('ownerId', isEqualTo: userId)
+        .where('status', whereIn: ['Available', 'Pending'])
+        .orderBy('createdAt', descending: true)
+        .snapshots();
+  }
+
+  Stream<QuerySnapshot> getAvailableItems() {
+    return FirebaseFirestore.instance
+        .collection('food_items')
+        .where('status', whereIn: ['Available', 'Pending'])
+        .orderBy('createdAt', descending: true)
         .snapshots();
   }
 }

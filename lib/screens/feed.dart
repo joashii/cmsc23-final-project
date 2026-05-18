@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../api/pantry.api.dart';
 import '../provider/auth.provider.dart';
+import 'food_details_page.dart';
 
 class FoodFeedPage extends StatefulWidget {
   const FoodFeedPage({super.key});
@@ -201,7 +202,7 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
         const SizedBox(height: 12),
 
         StreamBuilder<QuerySnapshot>(
-          stream: FirebasePantryAPI().getAllItems(),
+          stream: FirebasePantryAPI().getAvailableItems(),
           builder: (context, snapshot) {
             if (snapshot.hasError) {
               return Text("Error: ${snapshot.error}");
@@ -222,161 +223,145 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
                 final currentUserId = FirebaseAuth.instance.currentUser!.uid;
 
                 final ownerId = data['ownerId'] ?? "";
-                final requesterId = data['requestedBy'] ?? "";
                 final bool isOwner = currentUserId == ownerId;
 
                 String itemName = data['name'] ?? "Unnamed Item";
-                String itemStatus = data['status'] ?? "Available";
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  height: 180,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 5,
-                        spreadRadius: 1,
-                        offset: const Offset(0, 0),
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            FoodDetailsPage(docId: doc.id, foodData: data),
                       ),
-                    ],
-                  ),
-
-                  child: Row(
-                    children: [
-                      Expanded(
-                        flex: 6,
-                        child: ClipRRect(
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(20),
-                            bottomLeft: Radius.circular(20),
-                          ),
-                          child: data["imageBase64"] != null
-                              ? Image.memory(
-                                  base64Decode(data["imageBase64"]),
-                                  fit: BoxFit.cover,
-                                  width: double.infinity,
-                                  height: double.infinity,
-                                )
-                              : Container(
-                                  color: Colors.grey.shade300,
-                                  child: const Center(
-                                    child: Icon(
-                                      Icons.fastfood,
-                                      size: 50,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
+                    );
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    height: 180,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 5,
+                          spreadRadius: 1,
+                          offset: const Offset(0, 2),
                         ),
-                      ),
-
-                      Expanded(
-                        flex: 4,
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                data['postType'] ?? "PANTRY ITEM",
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-
-                              const SizedBox(height: 8),
-
-                              Text(
-                                itemName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-
-                              const SizedBox(height: 4),
-
-                              Text(
-                                data['shelfLife'] ?? "Fresh",
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-
-                              const Spacer(),
-
-                              if (isOwner && itemStatus == "Available")
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.red,
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 6,
+                          child: ClipRRect(
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(20),
+                              bottomLeft: Radius.circular(20),
+                            ),
+                            child: data["imageBase64"] != null
+                                ? Image.memory(
+                                    base64Decode(data["imageBase64"]),
+                                    fit: BoxFit.cover,
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                  )
+                                : Container(
+                                    color: Colors.grey.shade300,
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.fastfood,
+                                        size: 50,
+                                        color: Colors.white,
+                                      ),
                                     ),
-                                    onPressed: () async {
-                                      await FirebasePantryAPI().deleteFoodItem(
-                                        doc.id,
-                                      );
-                                    },
-                                    child: const Text("Cancel Post"),
                                   ),
-                                )
-                              else if (!isOwner && itemStatus == "Available")
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton(
-                                    onPressed: () async {
-                                      await FirebaseFirestore.instance
-                                          .collection("food_items")
-                                          .doc(doc.id)
-                                          .update({
-                                            "status": "Pending",
-                                            "requestedBy": currentUserId,
-                                          });
-                                    },
-                                    child: const Text("Request"),
-                                  ),
-                                )
-                              else if (isOwner && itemStatus == "Pending")
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton(
-                                    onPressed: () async {
-                                      await FirebasePantryAPI()
-                                          .updateItemStatus(doc.id, "Reserved");
-                                    },
-                                    child: const Text("Accept Request"),
-                                  ),
-                                )
-                              else if (!isOwner &&
-                                  itemStatus == "Pending" &&
-                                  requesterId == currentUserId)
-                                const Text(
-                                  "Waiting for owner approval",
+                          ),
+                        ),
+
+                        Expanded(
+                          flex: 4,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  data['postType'] ?? "PANTRY ITEM",
                                   style: TextStyle(
-                                    color: Colors.orange,
+                                    fontSize: 11,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+
+                                const SizedBox(height: 8),
+
+                                Text(
+                                  itemName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 20,
                                     fontWeight: FontWeight.bold,
                                   ),
-                                )
-                              else if (itemStatus == "Reserved")
-                                const Text(
-                                  "Reserved",
+                                ),
+
+                                const SizedBox(height: 4),
+
+                                Text(
+                                  data['category'] ?? "No category",
                                   style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+
+                                const SizedBox(height: 4),
+
+                                Text(
+                                  data['ownerName'] ?? "Anonymous User",
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                ),
+
+                                const SizedBox(height: 4),
+
+                                Text(
+                                  "2.3 km away",
+                                  style: TextStyle(
+                                    fontSize: 12,
                                     color: Colors.green,
-                                    fontWeight: FontWeight.bold,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
-                            ],
+
+                                const Spacer(),
+
+                                if (isOwner)
+                                  const Text(
+                                    "Your Post",
+                                    style: TextStyle(
+                                      color: Colors.blue,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                else
+                                  const Text(
+                                    "View details",
+                                    style: TextStyle(
+                                      color: Colors.green,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 );
               }).toList(),

@@ -374,7 +374,23 @@ class _PostItemPageState extends State<PostItemPage> {
 
                         final user = FirebaseAuth.instance.currentUser;
 
-                        // Save post data to Firestore
+                        if (user == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("You must be logged in to post."),
+                            ),
+                          );
+                          return;
+                        }
+
+                        final userDoc = await FirebaseFirestore.instance
+                            .collection("users")
+                            .doc(user.uid)
+                            .get();
+
+                        final ownerName =
+                            userDoc.data()?['username'] ?? "Anonymous User";
+
                         final Map<String, dynamic> newFoodItem = {
                           'postType': widget.postType,
                           'name': _nameController.text.trim(),
@@ -386,9 +402,9 @@ class _PostItemPageState extends State<PostItemPage> {
                           'status': 'Available',
                           'createdAt': Timestamp.now(),
                           'imageBase64': base64Image,
-
-                          'ownerId': user?.uid, // who posted it
-                          'requestedBy': null, // who requested it
+                          'ownerId': user.uid,
+                          'ownerName': ownerName,
+                          'requestedBy': [],
                         };
 
                         await FirebasePantryAPI().addFoodItem(newFoodItem);

@@ -244,22 +244,12 @@ class _ProfilePageState extends State<ProfilePage> {
                     );
                   }
 
-                  return SliverGrid(
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          crossAxisSpacing: 2,
-                          mainAxisSpacing: 2,
-                          childAspectRatio: 1.0,
-                        ),
+                  return SliverList(
                     delegate: SliverChildBuilderDelegate((context, index) {
-                      final data = docs[index].data() as Map<String, dynamic>;
-                      final imageBase64 = data['imageBase64'] as String?;
+                      final doc = docs[index];
+                      final data = doc.data() as Map<String, dynamic>;
 
-                      return _PantryGridTile(
-                        imageBase64: imageBase64,
-                        colorScheme: colorScheme,
-                      );
+                      return _MyPostCard(docId: doc.id, data: data);
                     }, childCount: docs.length),
                   );
                 },
@@ -462,6 +452,101 @@ class _TabButton extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _MyPostCard extends StatelessWidget {
+  final String docId;
+  final Map<String, dynamic> data;
+
+  const _MyPostCard({required this.docId, required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final imageBase64 = data['imageBase64'];
+    final itemName = data['name'] ?? "Unnamed Item";
+    final shelfLife = data['shelfLife'] ?? "Unknown";
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      height: 180,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 5),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 6,
+            child: ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                bottomLeft: Radius.circular(20),
+              ),
+              child: imageBase64 != null
+                  ? Image.memory(
+                      base64Decode(imageBase64),
+                      fit: BoxFit.cover,
+                      height: double.infinity,
+                      width: double.infinity,
+                    )
+                  : Container(color: Colors.grey),
+            ),
+          ),
+
+          Expanded(
+            flex: 4,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    data['postType'] ?? "PANTRY",
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  Text(
+                    itemName,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+
+                  const SizedBox(height: 4),
+
+                  Text(
+                    shelfLife,
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
+
+                  const Spacer(),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                      ),
+                      onPressed: () async {
+                        await FirebasePantryAPI().deleteFoodItem(docId);
+                      },
+                      child: const Text("Delete Item"),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
