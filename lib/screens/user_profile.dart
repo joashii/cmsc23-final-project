@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:elbeats/api/pantry.api.dart';
+import 'package:elbeats/components/request_card.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../provider/auth.provider.dart';
@@ -8,257 +9,289 @@ import 'food_details_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
+
   @override
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
 class _ProfilePageState extends State<ProfilePage> {
   final FirebasePantryAPI _pantryApi = FirebasePantryAPI();
-  int _postCount = 0;
+  int _selectedTab = 0;
+
+  Stream<DocumentSnapshot> _userDocStream(String uid) {
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .snapshots();
+  }
+
+  Widget _buildPantryTab(String uid, ColorScheme colorScheme) {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+      sliver: StreamBuilder<QuerySnapshot>(
+        stream: _pantryApi.getUserItems(uid),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const SliverToBoxAdapter(
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          final docs = snapshot.data!.docs;
+
+          if (docs.isEmpty) {
+            return SliverToBoxAdapter(
+              child: _EmptyPantryState(colorScheme: colorScheme),
+            );
+          }
+
+          return SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final doc = docs[index];
+                final data = doc.data() as Map<String, dynamic>;
+
+                return _MyPostCard(docId: doc.id, data: data);
+              },
+              childCount: docs.length,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildRequestsTab(String uid, ColorScheme colorScheme) {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+      sliver: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('claims')
+            .where('requesterID', isEqualTo: uid)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const SliverToBoxAdapter(
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          final claims = snapshot.data!.docs;
+
+          if (claims.isEmpty) {
+            return const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.all(40),
+                child: Text("No requests yet."),
+              ),
+            );
+          }
+
+          return SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final claim = claims[index].data() as Map<String, dynamic>;
+                final itemId = claim['itemID'];
+
+                return FutureBuilder<DocumentSnapshot>(
+                  future: FirebaseFirestore.instance
+                      .collection('food_items')
+                      .doc(itemId)
+                      .get(),
+                  builder: (context, itemSnap) {
+                    if (!itemSnap.hasData) {
+                      return const SizedBox(
+                        height: 80,
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    }
+
+                    final item =
+                        itemSnap.data!.data() as Map<String, dynamic>;
+
+                    return RequestCard(
+                      itemId: itemId,
+                      item: item,
+                      claim: claim,
+                      claimId: claims[index].id,
+                    );
+                  },
+                );
+              },
+              childCount: claims.length,
+            ),
+          );
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final user = context.watch<UserAuthProvider>().userObj;
+    final authUser = context.watch<UserAuthProvider>().userObj;
 
-    final displayName = user?.displayName?.isNotEmpty == true
-        ? user!.displayName!
-        : "User";
-    final email = user?.email ?? "";
+    if (authUser == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
-    return Scaffold(
-      backgroundColor: colorScheme.surface,
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            backgroundColor: colorScheme.surface,
-            elevation: 0,
-            centerTitle: true,
+    return StreamBuilder<DocumentSnapshot>(
+      stream: _userDocStream(authUser.uid),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
 
-            title: Text(
-              displayName,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onSurface,
+        final userData =
+            snapshot.data!.data() as Map<String, dynamic>? ?? {};
+
+        final displayName = userData['username'] ?? "User";
+        final email = userData['email'] ?? "";
+
+        final listingsStream = FirebaseFirestore.instance
+            .collection('food_items')
+            .where('ownerId', isEqualTo: authUser.uid)
+            .snapshots();
+
+        final claimsStream = FirebaseFirestore.instance
+            .collection('claims')
+            .where('requesterID', isEqualTo: authUser.uid)
+            .snapshots();
+
+        return Scaffold(
+          backgroundColor: colorScheme.surface,
+          body: CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                backgroundColor: colorScheme.surface,
+                elevation: 0,
+                centerTitle: true,
+                title: Text(
+                  displayName,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface,
+                      ),
+                ),
+                actions: [
+                  IconButton(
+                    onPressed: () async {
+                      await context.read<UserAuthProvider>().signOut();
+                    },
+                    icon: const Icon(Icons.logout_rounded),
+                  )
+                ],
               ),
-            ),
-            actions: [
-              IconButton(
-                onPressed: () async {
-                  try {
-                    // Trigger the Firebase sign out through your provider
-                    await context.read<UserAuthProvider>().signOut();
 
-                    // AuthWrapper (main.dart) handles the navigation automatically
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Logout failed: $e")),
-                      );
-                    }
-                  }
-                },
-                icon: const Icon(Icons.logout_rounded),
-                color: colorScheme.onSurface,
-              ),
-            ],
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(1),
-              child: Divider(
-                height: 1,
-                thickness: 0.5,
-                color: colorScheme.outlineVariant,
-              ),
-            ),
-          ),
-
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: Column(
-                children: [
-                  const SizedBox(height: 16),
-
-                  // Avatar + stats row
-                  Row(
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
                     children: [
-                      Container(
-                        width: 86,
-                        height: 86,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: colorScheme.primary,
-                            width: 2,
+                      const SizedBox(height: 16),
+
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 42,
+                            backgroundColor: colorScheme.primaryContainer,
+                            child: Icon(Icons.person,
+                                size: 42, color: colorScheme.primary),
                           ),
-                        ),
-                        child: CircleAvatar(
-                          radius: 42,
-                          backgroundColor: colorScheme.primaryContainer,
-                          child: Icon(
-                            Icons.person,
-                            size: 42,
-                            color: colorScheme.primary,
+                          const SizedBox(width: 32),
+
+                          Expanded(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                StreamBuilder<QuerySnapshot>(
+                                  stream: listingsStream,
+                                  builder: (context, snapshot) {
+                                    return _StatColumn(
+                                      label: "Listings",
+                                      value:
+                                          (snapshot.data?.docs.length ?? 0)
+                                              .toString(),
+                                    );
+                                  },
+                                ),
+                                StreamBuilder<QuerySnapshot>(
+                                  stream: claimsStream,
+                                  builder: (context, snapshot) {
+                                    return _StatColumn(
+                                      label: "Requests",
+                                      value:
+                                          (snapshot.data?.docs.length ?? 0)
+                                              .toString(),
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
+                        ],
                       ),
 
-                      const SizedBox(width: 32),
+                      const SizedBox(height: 12),
 
-                      Expanded(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _StatColumn(
-                              label: "Listings",
-                              value: _postCount.toString(),
-                            ),
-                            _StatColumn(label: "Requests", value: "0"),
+                            Text(displayName,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 4),
+                            Text(email),
                           ],
                         ),
                       ),
-                    ],
-                  ),
 
-                  const SizedBox(height: 12),
+                      const SizedBox(height: 16),
 
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          displayName,
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.onSurface,
-                              ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          email,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: colorScheme.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: colorScheme.primary,
-                            foregroundColor: colorScheme.onPrimary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: () {},
+                              child: const Text("Edit Profile"),
                             ),
                           ),
-                          onPressed: () {
-                            // TODO: edit profile
-                          },
-                          child: const Text(
-                            "Edit Profile",
-                            style: TextStyle(fontSize: 14),
-                          ),
-                        ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: colorScheme.outline),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: IconButton(
-                          onPressed: () {
-                            // TODO: share profile
-                          },
-                          icon: Icon(
-                            Icons.person_add_alt_1_outlined,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
+
+                      const SizedBox(height: 16),
                     ],
                   ),
-
-                  const SizedBox(height: 16),
-                ],
+                ),
               ),
-            ),
-          ),
 
-          SliverToBoxAdapter(
-            child: Divider(
-              height: 1,
-              thickness: 0.5,
-              color: colorScheme.outlineVariant,
-            ),
-          ),
-
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: _ProfileTabBarDelegate(colorScheme: colorScheme),
-          ),
-
-          if (user == null)
-            const SliverToBoxAdapter(child: SizedBox.shrink())
-          else
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-              sliver: StreamBuilder<QuerySnapshot>(
-                stream: _pantryApi.getUserItems(user.uid),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return SliverToBoxAdapter(
-                      child: Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(32.0),
-                          child: Text(
-                            "Error loading pantry",
-                            style: TextStyle(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const SliverToBoxAdapter(
-                      child: SizedBox(
-                        height: 200,
-                        child: Center(child: CircularProgressIndicator()),
-                      ),
-                    );
-                  }
-
-                  final docs = snapshot.data?.docs ?? [];
-                  _postCount = docs.length;
-
-                  if (docs.isEmpty) {
-                    return SliverToBoxAdapter(
-                      child: _EmptyPantryState(colorScheme: colorScheme),
-                    );
-                  }
-
-                  return SliverList(
-                    delegate: SliverChildBuilderDelegate((context, index) {
-                      final doc = docs[index];
-                      final data = doc.data() as Map<String, dynamic>;
-
-                      return _MyPostCard(docId: doc.id, data: data);
-                    }, childCount: docs.length),
-                  );
-                },
+              SliverPersistentHeader(
+                pinned: true,
+                delegate: _ProfileTabBarDelegate(
+                  colorScheme: colorScheme,
+                  selectedIndex: _selectedTab,
+                  onTabChanged: (index) {
+                    setState(() => _selectedTab = index);
+                  },
+                ),
               ),
-            ),
-        ],
-      ),
+
+              if (_selectedTab == 0)
+                _buildPantryTab(authUser.uid, colorScheme)
+              else
+                _buildRequestsTab(authUser.uid, colorScheme),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -367,8 +400,14 @@ class _EmptyPantryState extends StatelessWidget {
 
 class _ProfileTabBarDelegate extends SliverPersistentHeaderDelegate {
   final ColorScheme colorScheme;
+  final Function(int) onTabChanged;
+  final int selectedIndex;
 
-  _ProfileTabBarDelegate({required this.colorScheme});
+  _ProfileTabBarDelegate({
+    required this.colorScheme,
+    required this.onTabChanged,
+    required this.selectedIndex,
+  });
 
   @override
   double get minExtent => 44;
@@ -388,14 +427,16 @@ class _ProfileTabBarDelegate extends SliverPersistentHeaderDelegate {
           _TabButton(
             label: "My Pantry",
             icon: Icons.grid_view_rounded,
-            isSelected: true,
+            isSelected: selectedIndex == 0,
             colorScheme: colorScheme,
+            onTap: () => onTabChanged(0),
           ),
           _TabButton(
             label: "Requests",
             icon: Icons.arrow_forward_rounded,
-            isSelected: false,
+            isSelected: selectedIndex == 1,
             colorScheme: colorScheme,
+            onTap: () => onTabChanged(1),
           ),
         ],
       ),
@@ -404,7 +445,8 @@ class _ProfileTabBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(covariant _ProfileTabBarDelegate oldDelegate) {
-    return oldDelegate.colorScheme != colorScheme;
+    return oldDelegate.selectedIndex != selectedIndex ||
+        oldDelegate.colorScheme != colorScheme;
   }
 }
 
@@ -413,23 +455,32 @@ class _TabButton extends StatelessWidget {
   final IconData icon;
   final bool isSelected;
   final ColorScheme colorScheme;
+  final VoidCallback onTap;
 
   const _TabButton({
     required this.label,
     required this.icon,
     required this.isSelected,
     required this.colorScheme,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: InkWell(
-        onTap: () {
-          // TODO: switch tab
-        },
-        child: Container(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
           height: 44,
+          margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? colorScheme.primaryContainer
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
           alignment: Alignment.center,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -438,16 +489,17 @@ class _TabButton extends StatelessWidget {
                 icon,
                 size: 18,
                 color: isSelected
-                    ? colorScheme.onSurface
+                    ? colorScheme.onPrimaryContainer
                     : colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
               ),
               const SizedBox(width: 6),
               Text(
                 label,
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  fontWeight:
+                      isSelected ? FontWeight.w700 : FontWeight.w500,
                   color: isSelected
-                      ? colorScheme.onSurface
+                      ? colorScheme.onPrimaryContainer
                       : colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                 ),
               ),

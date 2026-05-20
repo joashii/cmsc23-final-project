@@ -44,7 +44,7 @@ class FirebasePantryAPI {
     return FirebaseFirestore.instance
         .collection('food_items')
         .where('ownerId', isEqualTo: userId)
-        .where('status', whereIn: ['Available', 'Pending'])
+        .where('status', whereIn: ['Available', 'Reserved', 'Completed'])
         .orderBy('createdAt', descending: true)
         .snapshots();
   }

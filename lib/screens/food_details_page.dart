@@ -1,7 +1,10 @@
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:elbeats/screens/request-item/request_item_details_screen.dart';
+import 'package:elbeats/screens/request-item/request_item_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/colors.dart';
@@ -21,6 +24,15 @@ class FoodDetailsPage extends StatefulWidget {
 }
 
 class _FoodDetailsPageState extends State<FoodDetailsPage> {
+
+  String _formatDate(dynamic timestamp) {
+    if (timestamp == null) return "Unknown";
+
+    final date = (timestamp as Timestamp).toDate();
+
+    return DateFormat("MMM d, y h:mm a").format(date);
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUserId = FirebaseAuth.instance.currentUser!.uid;
@@ -28,11 +40,7 @@ class _FoodDetailsPageState extends State<FoodDetailsPage> {
     final bool isOwner = currentUserId == ownerId;
 
     final List<dynamic> dietaryTags = widget.foodData['dietaryTags'] ?? [];
-
-    final List<dynamic> requestedUsers = widget.foodData['requestedBy'] ?? [];
-
-    final bool hasRequested = requestedUsers.contains(currentUserId);
-
+    
     return Scaffold(
       backgroundColor: AppColors.lightScheme.surface,
       body: SingleChildScrollView(
@@ -273,66 +281,64 @@ class _FoodDetailsPageState extends State<FoodDetailsPage> {
                     if (!isOwner)
                       SizedBox(
                         width: double.infinity,
-                        child: hasRequested
-                            ? OutlinedButton(
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide(
-                                    color: AppColors.forestGreen,
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30),
-                                  ),
-                                ),
-                                onPressed: null,
-                                child: Text(
-                                  "Request Sent",
-                                  style: TextStyle(
-                                    color: AppColors.forestGreen,
-                                  ),
-                                ),
-                              )
-                            : ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.forestGreen,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30),
-                                  ),
-                                ),
-                                onPressed: () async {
-                                  await FirebaseFirestore.instance
-                                      .collection("food_items")
-                                      .doc(widget.docId)
-                                      .update({
-                                        "status": "Pending",
-                                        "requestedBy": FieldValue.arrayUnion([
-                                          currentUserId,
-                                        ]),
-                                      });
+                        child: 
+                          StreamBuilder<QuerySnapshot>(
+                            stream: FirebaseFirestore.instance
+                                .collection('claims')
+                                .where('itemID', isEqualTo: widget.docId)
+                                .where('requesterID', isEqualTo: currentUserId)
+                                .limit(1)
+                                .snapshots(),
+                            builder: (context, snapshot) {
+                              final requested = snapshot.data?.docs.isNotEmpty ?? false;
 
-                                  setState(() {
-                                    widget.foodData["requestedBy"] = [
-                                      ...requestedUsers,
-                                      currentUserId,
-                                    ];
-                                  });
-
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        "Request sent successfully!",
+                              return requested
+                                  ? OutlinedButton(
+                                    style: OutlinedButton.styleFrom(
+                                      side: BorderSide(
+                                        color: AppColors.forestGreen,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 16,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(30),
                                       ),
                                     ),
-                                  );
-                                },
-                                child: const Text("Send Request"),
-                              ),
+                                    onPressed: null,
+                                    child: Text(
+                                      "Request Sent",
+                                      style: TextStyle(
+                                        color: AppColors.forestGreen,
+                                      ),
+                                    ),
+                                  )
+                                  : ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.forestGreen,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 16,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(30),
+                                        ),
+                                      ),
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => RequestItemScreen(
+                                              itemID: widget.docId,
+                                              ownerID: widget.foodData['ownerId'],
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      child: const Text("Send Request"),
+                                    );
+                                  },
+                                )
                       ),
 
                     const SizedBox(height: 30),
@@ -349,28 +355,27 @@ class _FoodDetailsPageState extends State<FoodDetailsPage> {
 
                       const SizedBox(height: 16),
 
-                      StreamBuilder<DocumentSnapshot>(
+                      StreamBuilder<QuerySnapshot>(
                         stream: FirebaseFirestore.instance
-                            .collection("food_items")
-                            .doc(widget.docId)
+                            .collection('claims')
+                            .where('itemID', isEqualTo: widget.docId)
                             .snapshots(),
                         builder: (context, snapshot) {
                           if (!snapshot.hasData) {
-                            return const CircularProgressIndicator();
+                            return const Center(child: CircularProgressIndicator());
                           }
 
-                          final updatedData =
-                              snapshot.data!.data() as Map<String, dynamic>;
+                          final claims = snapshot.data!.docs;
 
-                          final List requesters =
-                              updatedData["requestedBy"] ?? [];
-
-                          if (requesters.isEmpty) {
+                          if (claims.isEmpty) {
                             return const Text("No requests yet.");
                           }
 
                           return Column(
-                            children: requesters.map<Widget>((requesterId) {
+                            children: claims.map((claimDoc) {
+                              final claim = claimDoc.data() as Map<String, dynamic>;
+                              final requesterId = claim['requesterID'];
+
                               return FutureBuilder<DocumentSnapshot>(
                                 future: FirebaseFirestore.instance
                                     .collection("users")
@@ -382,48 +387,80 @@ class _FoodDetailsPageState extends State<FoodDetailsPage> {
                                   }
 
                                   final userData =
-                                      userSnapshot.data!.data()
-                                          as Map<String, dynamic>;
+                                      userSnapshot.data!.data() as Map<String, dynamic>;
 
-                                  return Card(
-                                    margin: const EdgeInsets.only(bottom: 12),
-                                    child: ListTile(
-                                      leading: CircleAvatar(
-                                        backgroundColor: AppColors.sproutGreen,
-                                        child: Text(
-                                          userData["username"][0].toUpperCase(),
+                                  return InkWell(
+                                    borderRadius: BorderRadius.circular(16),
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => RequestDetailsScreen(
+                                            claimId: claimDoc.id,
+                                            itemId: widget.docId,
+                                          ),
                                         ),
+                                      );
+                                    },
+                                    child: Card(
+                                      elevation: 2,
+                                      margin: const EdgeInsets.only(bottom: 12),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
                                       ),
-                                      title: Text(
-                                        userData["username"] ?? "Unknown User",
-                                      ),
-                                      subtitle: Text(userData["email"] ?? ""),
-                                      trailing: ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor:
-                                              AppColors.forestGreen,
-                                        ),
-                                        onPressed: () async {
-                                          await FirebaseFirestore.instance
-                                              .collection("food_items")
-                                              .doc(widget.docId)
-                                              .update({
-                                                "status": "Reserved",
-                                                "acceptedRequester":
-                                                    requesterId,
-                                              });
-
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                "Requester accepted!",
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(14),
+                                        child: Row(
+                                          children: [
+                                            CircleAvatar(
+                                              radius: 22,
+                                              backgroundColor: AppColors.sproutGreen,
+                                              child: Text(
+                                                (userData["username"] ?? "?")[0].toUpperCase(),
+                                                style: const TextStyle(color: Colors.white),
                                               ),
                                             ),
-                                          );
-                                        },
-                                        child: const Text("Accept"),
+
+                                            const SizedBox(width: 12),
+
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    userData["username"] ?? "Unknown User",
+                                                    style: const TextStyle(
+                                                      fontSize: 16,
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                                  ),
+
+                                                  const SizedBox(height: 3),
+
+                                                  Text(
+                                                    userData["email"] ?? "",
+                                                    style: TextStyle(
+                                                      fontSize: 13,
+                                                      color: Colors.grey.shade600,
+                                                    ),
+                                                  ),
+
+                                                  const SizedBox(height: 6),
+
+                                                  Text(
+                                                    "Requested: ${_formatDate(claim["requestedAt"])}",
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.grey.shade500,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+
+                                            const Icon(Icons.chevron_right, color: Colors.grey),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   );
