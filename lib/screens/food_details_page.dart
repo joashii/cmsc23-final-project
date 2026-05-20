@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/colors.dart';
 
-class FoodDetailsPage extends StatelessWidget {
+class FoodDetailsPage extends StatefulWidget {
   final String docId;
   final Map<String, dynamic> foodData;
 
@@ -17,12 +17,21 @@ class FoodDetailsPage extends StatelessWidget {
   });
 
   @override
+  State<FoodDetailsPage> createState() => _FoodDetailsPageState();
+}
+
+class _FoodDetailsPageState extends State<FoodDetailsPage> {
+  @override
   Widget build(BuildContext context) {
     final currentUserId = FirebaseAuth.instance.currentUser!.uid;
-    final ownerId = foodData['ownerId'];
+    final ownerId = widget.foodData['ownerId'];
     final bool isOwner = currentUserId == ownerId;
 
-    final List<dynamic> dietaryTags = foodData['dietaryTags'] ?? [];
+    final List<dynamic> dietaryTags = widget.foodData['dietaryTags'] ?? [];
+
+    final List<dynamic> requestedUsers = widget.foodData['requestedBy'] ?? [];
+
+    final bool hasRequested = requestedUsers.contains(currentUserId);
 
     return Scaffold(
       backgroundColor: AppColors.lightScheme.surface,
@@ -35,9 +44,9 @@ class FoodDetailsPage extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   height: MediaQuery.of(context).size.height * 0.45,
-                  child: foodData["imageBase64"] != null
+                  child: widget.foodData["imageBase64"] != null
                       ? Image.memory(
-                          base64Decode(foodData["imageBase64"]),
+                          base64Decode(widget.foodData["imageBase64"]),
                           fit: BoxFit.cover,
                         )
                       : Container(
@@ -101,7 +110,7 @@ class FoodDetailsPage extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                foodData['name'] ?? "Unnamed Item",
+                                widget.foodData['name'] ?? "Unnamed Item",
                                 style: const TextStyle(
                                   fontSize: 28,
                                   fontWeight: FontWeight.bold,
@@ -111,7 +120,7 @@ class FoodDetailsPage extends StatelessWidget {
                               const SizedBox(height: 8),
 
                               Text(
-                                foodData['category'] ?? "No category",
+                                widget.foodData['category'] ?? "No category",
                                 style: TextStyle(
                                   color: Colors.grey.shade600,
                                   fontSize: 16,
@@ -163,7 +172,7 @@ class FoodDetailsPage extends StatelessWidget {
                                 if (confirm == true) {
                                   await FirebaseFirestore.instance
                                       .collection("food_items")
-                                      .doc(docId)
+                                      .doc(widget.docId)
                                       .delete();
 
                                   if (context.mounted) {
@@ -217,7 +226,8 @@ class FoodDetailsPage extends StatelessWidget {
                     const SizedBox(height: 8),
 
                     Text(
-                      foodData['description'] ?? "No description provided",
+                      widget.foodData['description'] ??
+                          "No description provided",
                       style: const TextStyle(fontSize: 16),
                     ),
 
@@ -235,7 +245,7 @@ class FoodDetailsPage extends StatelessWidget {
                     const SizedBox(height: 8),
 
                     Text(
-                      foodData['shelfLife'] ?? "Not specified",
+                      widget.foodData['shelfLife'] ?? "Not specified",
                       style: const TextStyle(fontSize: 16),
                     ),
 
@@ -253,7 +263,7 @@ class FoodDetailsPage extends StatelessWidget {
                     const SizedBox(height: 8),
 
                     Text(
-                      foodData['setupMethod'] ?? "Not specified",
+                      widget.foodData['setupMethod'] ?? "Not specified",
                       style: const TextStyle(fontSize: 16),
                     ),
 
@@ -263,37 +273,66 @@ class FoodDetailsPage extends StatelessWidget {
                     if (!isOwner)
                       SizedBox(
                         width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.forestGreen,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30),
-                            ),
-                          ),
-                          onPressed: () async {
-                            await FirebaseFirestore.instance
-                                .collection("food_items")
-                                .doc(docId)
-                                .update({
-                                  "status": "Pending",
-                                  "requestedBy": FieldValue.arrayUnion([
-                                    currentUserId,
-                                  ]),
-                                });
-
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text("Request sent successfully!"),
+                        child: hasRequested
+                            ? OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(
+                                    color: AppColors.forestGreen,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
                                 ),
-                              );
+                                onPressed: null,
+                                child: Text(
+                                  "Request Sent",
+                                  style: TextStyle(
+                                    color: AppColors.forestGreen,
+                                  ),
+                                ),
+                              )
+                            : ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.forestGreen,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                ),
+                                onPressed: () async {
+                                  await FirebaseFirestore.instance
+                                      .collection("food_items")
+                                      .doc(widget.docId)
+                                      .update({
+                                        "status": "Pending",
+                                        "requestedBy": FieldValue.arrayUnion([
+                                          currentUserId,
+                                        ]),
+                                      });
 
-                              Navigator.pop(context);
-                            }
-                          },
-                          child: const Text("Send Request"),
-                        ),
+                                  setState(() {
+                                    widget.foodData["requestedBy"] = [
+                                      ...requestedUsers,
+                                      currentUserId,
+                                    ];
+                                  });
+
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        "Request sent successfully!",
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: const Text("Send Request"),
+                              ),
                       ),
 
                     const SizedBox(height: 30),
@@ -313,7 +352,7 @@ class FoodDetailsPage extends StatelessWidget {
                       StreamBuilder<DocumentSnapshot>(
                         stream: FirebaseFirestore.instance
                             .collection("food_items")
-                            .doc(docId)
+                            .doc(widget.docId)
                             .snapshots(),
                         builder: (context, snapshot) {
                           if (!snapshot.hasData) {
@@ -367,7 +406,7 @@ class FoodDetailsPage extends StatelessWidget {
                                         onPressed: () async {
                                           await FirebaseFirestore.instance
                                               .collection("food_items")
-                                              .doc(docId)
+                                              .doc(widget.docId)
                                               .update({
                                                 "status": "Reserved",
                                                 "acceptedRequester":

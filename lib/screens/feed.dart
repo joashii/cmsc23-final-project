@@ -18,57 +18,6 @@ class FoodFeedPage extends StatefulWidget {
 
 class _FoodFeedPageState extends State<FoodFeedPage> {
   @override
-  void initState() {
-    super.initState();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final auth = context.read<UserAuthProvider>();
-
-      if (auth.isNewRegistration) {
-        _showNotificationModal();
-        auth.setNewRegistration(false);
-      }
-    });
-  }
-
-  void _showNotificationModal() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        icon: Icon(
-          Icons.notifications_active,
-          color: Theme.of(context).colorScheme.primary,
-          size: 40,
-        ),
-        title: const Text("Stay Updated"),
-        content: const Text(
-          "Would you like to receive alerts when new food is shared in your area?",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text("Maybe Later"),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Notifications Enabled!")),
-              );
-            },
-            child: const Text("Enable"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: null,
@@ -220,7 +169,8 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
               children: snapshot.data!.docs.map((doc) {
                 Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
 
-                final currentUserId = FirebaseAuth.instance.currentUser!.uid;
+                final currentUserId =
+                    FirebaseAuth.instance.currentUser?.uid ?? "";
 
                 final ownerId = data['ownerId'] ?? "";
                 final bool isOwner = currentUserId == ownerId;

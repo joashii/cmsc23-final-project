@@ -6,9 +6,6 @@ class UserAuthProvider with ChangeNotifier {
   late FirebaseAuthAPI authService;
   late Stream<User?> uStream;
   User? userObj;
-  bool _isNewRegistration = false;
-
-  bool get isNewRegistration => _isNewRegistration;
 
   UserAuthProvider() {
     authService = FirebaseAuthAPI();
@@ -23,11 +20,6 @@ class UserAuthProvider with ChangeNotifier {
 
   Stream<User?> get userStream => uStream;
   User? get currentUser => userObj;
-
-  void setNewRegistration(bool value) {
-    _isNewRegistration = value;
-    notifyListeners();
-  }
 
   Future<void> signIn(String email, String password) async {
     await authService.signIn(email, password);

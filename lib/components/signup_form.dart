@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../provider/auth.provider.dart';
 
 import 'package:elbeats/screens/account-creation/select_interests.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class SignupForm extends StatefulWidget {
   const SignupForm({super.key});
@@ -12,10 +14,11 @@ class SignupForm extends StatefulWidget {
 }
 
 class _SignupFormState extends State<SignupForm> {
-  // 1. The GlobalKey identifies the form for validation
+  // The GlobalKey identifies the form for validation
   final _formKey = GlobalKey<FormState>();
 
-  // 2. Controllers to retrieve the text values
+  // Controllers to retrieve the text values
+  final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -43,7 +46,29 @@ class _SignupFormState extends State<SignupForm> {
               "Experience a better way to share food.",
               style: Theme.of(context).textTheme.bodyMedium,
             ),
+
             const SizedBox(height: 32),
+
+            // Username Field
+            TextFormField(
+              controller: _usernameController,
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.person_outline),
+                label: Text("Username"),
+                border: OutlineInputBorder(),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return "Username is required";
+                }
+                if (value.length < 3) {
+                  return "Username must be at least 3 characters";
+                }
+                return null;
+              },
+            ),
+
+            const SizedBox(height: 16),
 
             // Email Field
             TextFormField(
@@ -86,9 +111,7 @@ class _SignupFormState extends State<SignupForm> {
               controller: _confirmPasswordController,
               obscureText: true,
               decoration: const InputDecoration(
-                prefixIcon: Icon(
-                  Icons.lock_reset,
-                ), // Changed icon to differentiate
+                prefixIcon: Icon(Icons.lock_reset),
                 label: Text("Confirm Password"),
                 border: OutlineInputBorder(),
               ),
@@ -127,20 +150,25 @@ class _SignupFormState extends State<SignupForm> {
                   if (_formKey.currentState!.validate()) {
                     final auth = context.read<UserAuthProvider>();
                     try {
-                      // 1. Create the Auth Account
+                      // Create the Auth Account
                       await auth.signUp(
                         _emailController.text.trim(),
                         _passwordController.text.trim(),
                       );
 
-                      // 2. Move to Step 2: Interest Tags
-                      if (context.mounted) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const InterestTagsScreen(),
-                          ),
-                        );
+                      final user = FirebaseAuth.instance.currentUser;
+
+                      if (user != null) {
+                        // Write Firestore doc BEFORE auth stream triggers routing
+                        await FirebaseFirestore.instance
+                            .collection("users")
+                            .doc(user.uid)
+                            .set({
+                              "username": _usernameController.text.trim(),
+                              "email": _emailController.text.trim(),
+                              "uid": user.uid,
+                              "isOnboardingComplete": false,
+                            });
                       }
                     } catch (e) {
                       if (context.mounted) {

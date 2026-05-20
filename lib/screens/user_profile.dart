@@ -3,8 +3,8 @@ import 'package:elbeats/api/pantry.api.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../provider/auth.provider.dart';
-
 import 'dart:convert';
+import 'food_details_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -34,6 +34,7 @@ class _ProfilePageState extends State<ProfilePage> {
             backgroundColor: colorScheme.surface,
             elevation: 0,
             centerTitle: true,
+
             title: Text(
               displayName,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -41,15 +42,21 @@ class _ProfilePageState extends State<ProfilePage> {
                 color: colorScheme.onSurface,
               ),
             ),
-            leading: IconButton(
-              onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.arrow_back_ios_new_rounded),
-              color: colorScheme.onSurface,
-            ),
             actions: [
               IconButton(
                 onPressed: () async {
-                  await context.read<UserAuthProvider>().signOut();
+                  try {
+                    // Trigger the Firebase sign out through your provider
+                    await context.read<UserAuthProvider>().signOut();
+
+                    // AuthWrapper (main.dart) handles the navigation automatically
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Logout failed: $e")),
+                      );
+                    }
+                  }
                 },
                 icon: const Icon(Icons.logout_rounded),
                 color: colorScheme.onSurface,
@@ -199,12 +206,7 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
 
           if (user == null)
-            const SliverToBoxAdapter(
-              child: SizedBox(
-                height: 200,
-                child: Center(child: Text("Sign in to view your pantry")),
-              ),
-            )
+            const SliverToBoxAdapter(child: SizedBox.shrink())
           else
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
@@ -465,88 +467,101 @@ class _MyPostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final imageBase64 = data['imageBase64'];
     final itemName = data['name'] ?? "Unnamed Item";
-    final shelfLife = data['shelfLife'] ?? "Unknown";
+    final foodCategory = data['postType'] ?? "PANTRY"; // or data['category']
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      height: 180,
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(20),
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withOpacity(0.5),
+          width: 1,
+        ),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 5),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 6,
-            child: ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(20),
-                bottomLeft: Radius.circular(20),
-              ),
-              child: imageBase64 != null
-                  ? Image.memory(
-                      base64Decode(imageBase64),
-                      fit: BoxFit.cover,
-                      height: double.infinity,
-                      width: double.infinity,
-                    )
-                  : Container(color: Colors.grey),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  FoodDetailsPage(docId: docId, foodData: data),
             ),
-          ),
-
-          Expanded(
-            flex: 4,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    data['postType'] ?? "PANTRY",
-                    style: TextStyle(color: Colors.grey.shade600),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  Text(
-                    itemName,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-
-                  const SizedBox(height: 4),
-
-                  Text(
-                    shelfLife,
-                    style: TextStyle(color: Colors.grey.shade600),
-                  ),
-
-                  const Spacer(),
-
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          child: Row(
+            children: [
+              // Circular Image Avatar
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest,
+                  shape: BoxShape.circle,
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: imageBase64 != null && imageBase64.toString().isNotEmpty
+                    ? Image.memory(base64Decode(imageBase64), fit: BoxFit.cover)
+                    : Icon(
+                        Icons.fastfood_rounded,
+                        color: colorScheme.onSurfaceVariant,
+                        size: 28,
                       ),
-                      onPressed: () async {
-                        await FirebasePantryAPI().deleteFoodItem(docId);
-                      },
-                      child: const Text("Delete Item"),
-                    ),
-                  ),
-                ],
               ),
-            ),
+              const SizedBox(width: 16),
+
+              // Food Name & Category stacked vertically
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      itemName,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: -0.3,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      foodCategory.toLowerCase(),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: colorScheme.onSurfaceVariant.withOpacity(0.8),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+
+              // Trailing arrow icon indicator
+              Icon(
+                Icons.chevron_right_rounded,
+                color: colorScheme.onSurfaceVariant.withOpacity(0.4),
+                size: 24,
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

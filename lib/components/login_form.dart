@@ -17,6 +17,9 @@ class _LoginFormState extends State<LoginForm> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
+  // Track the loading state of the login request
+  bool _isLoading = false;
+
   // Clean up controllers when the widget is destroyed
   @override
   void dispose() {
@@ -53,11 +56,12 @@ class _LoginFormState extends State<LoginForm> {
             // Email Field
             TextFormField(
               controller: _emailController,
+              enabled: !_isLoading, // Disable during network request
               keyboardType: TextInputType.emailAddress,
               decoration: const InputDecoration(
                 prefixIcon: Icon(Icons.email_outlined),
                 label: Text("Email"),
-                border: OutlineInputBorder(), // Modern M3 outlined look
+                border: OutlineInputBorder(),
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) return "Email is required";
@@ -70,6 +74,7 @@ class _LoginFormState extends State<LoginForm> {
             // Password Field
             TextFormField(
               controller: _passwordController,
+              enabled: !_isLoading, // Disable during network request
               obscureText: true,
               decoration: const InputDecoration(
                 prefixIcon: Icon(Icons.lock_outline),
@@ -99,38 +104,62 @@ class _LoginFormState extends State<LoginForm> {
                     context,
                   ).colorScheme.onPrimary, // White
                 ),
-                onPressed: () async {
-                  if (_formKey.currentState!.validate()) {
-                    // Access your existing AuthProvider
-                    final auth = context.read<UserAuthProvider>();
+                // Disable the click handler entirely while loading
+                onPressed: _isLoading
+                    ? null
+                    : () async {
+                        if (_formKey.currentState!.validate()) {
+                          setState(() => _isLoading = true);
 
-                    try {
-                      await auth.signIn(
-                        _emailController.text.trim(),
-                        _passwordController.text.trim(),
-                      );
-                      // On success, AuthWrapper (in main.dart) redirects to Feed automatically
-                    } catch (e) {
-                      // Show error if login fails (e.g. wrong password)
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("Error: ${e.toString()}")),
-                        );
-                      }
-                    }
-                  }
-                },
-                child: const Text("Login", style: TextStyle(fontSize: 16)),
+                          try {
+                            if (!context.mounted) return;
+                            // Access your existing AuthProvider
+                            final auth = context.read<UserAuthProvider>();
+
+                            await auth.signIn(
+                              _emailController.text.trim(),
+                              _passwordController.text.trim(),
+                            );
+
+                            // AuthWrapper automatically reacts to the stream changing.
+                          } catch (e) {
+                            // Turn off loading spinner if an error happens so they can try again
+                            if (mounted) {
+                              setState(() => _isLoading = false);
+                            }
+
+                            // Show error if login fails (e.g. wrong password)
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text("Error: ${e.toString()}"),
+                                ),
+                              );
+                            }
+                          }
+                        }
+                      },
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text("Login", style: TextStyle(fontSize: 16)),
               ),
             ),
             const SizedBox(height: 8), // Small gap between buttons
             // Forgot Password Prompt
             TextButton(
-              onPressed: () {
-                // Navigate to a forgot password screen or show a dialog
-                // For now, let's just print a message
-                print("Redirect to Forgot Password logic");
-              },
+              onPressed: _isLoading
+                  ? null
+                  : () {
+                      // Navigate to a forgot password screen or show a dialog
+                      print("Redirect to Forgot Password logic");
+                    },
               child: Text(
                 "Forgot Password?",
                 style: TextStyle(
