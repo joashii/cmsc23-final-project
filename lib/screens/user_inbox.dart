@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:elbeats/api/notification.api.dart';
 import 'package:elbeats/screens/food_details_page.dart';
+import 'package:elbeats/screens/chat/chat_screen.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
@@ -221,62 +222,237 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   // Message Preview Builder
   Widget _buildMessagesList(ColorScheme colorScheme) {
-    // Mock Data
-    final mockChats = [
-      {
-        "name": "Juana Dela Cruz",
-        "lastMsg": "Can I pick up the items at 4 PM?",
-        "time": "10m ago",
-        "unread": true,
-      },
-      {
-        "name": "Mark Santos",
-        "lastMsg": "Thank you so much for the food!",
-        "time": "Yesterday",
-        "unread": false,
-      },
-    ];
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) {
+      return const Center(child: Text("Please log in to view messages."));
+    }
 
-    return ListView.builder(
-      itemCount: mockChats.length,
-      itemBuilder: (context, index) {
-        final chat = mockChats[index];
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection("chats")
+          .where("participants", arrayContains: currentUserId)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text("Error loading messages: ${snapshot.error}"),
+            ),
+          );
+        }
+
+        final chatDocs = snapshot.data?.docs ?? [];
+
+        // Sort chats by lastMessageAt descending client-side
+        final sortedDocs = List<QueryDocumentSnapshot>.from(chatDocs);
+        sortedDocs.sort((a, b) {
+          final dataA = a.data() as Map<String, dynamic>;
+          final dataB = b.data() as Map<String, dynamic>;
+          final timeA = dataA['lastMessageAt'] as Timestamp?;
+          final timeB = dataB['lastMessageAt'] as Timestamp?;
+          if (timeA == null && timeB == null) return 0;
+          if (timeA == null) return 1;
+          if (timeB == null) return -1;
+          return timeB.compareTo(timeA);
+        });
+
+        if (sortedDocs.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.chat_bubble_outline,
+                  size: 64,
+                  color: colorScheme.outline,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  "No messages yet",
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          itemCount: sortedDocs.length,
+          itemBuilder: (context, index) {
+            final doc = sortedDocs[index];
+            return _ChatListTile(
+              chatId: doc.id,
+              chatData: doc.data() as Map<String, dynamic>,
+              currentUserId: currentUserId,
+              colorScheme: colorScheme,
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _ChatListTile extends StatelessWidget {
+  final String chatId;
+  final Map<String, dynamic> chatData;
+  final String currentUserId;
+  final ColorScheme colorScheme;
+
+  const _ChatListTile({
+    required this.chatId,
+    required this.chatData,
+    required this.currentUserId,
+    required this.colorScheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final participants = List<String>.from(chatData['participants'] ?? []);
+    final otherUserId = participants.firstWhere((id) => id != currentUserId, orElse: () => "");
+    final postId = chatData['postID'] ?? "";
+
+    final lastMessage = chatData['lastMessage'] ?? "No messages yet";
+    final lastMessageAt = chatData['lastMessageAt'] as Timestamp?;
+    final lastSeenMap = Map<String, dynamic>.from(chatData['lastSeen'] ?? {});
+    final myLastSeen = lastSeenMap[currentUserId] as Timestamp?;
+
+    // Check if unread (if last message sender is not currentUserId and last message is after myLastSeen)
+    final lastMessageSenderID = chatData['lastMessageSenderID'] as String?;
+    bool isUnread = false;
+    if (lastMessageSenderID != null && lastMessageSenderID != currentUserId) {
+      if (myLastSeen == null) {
+        isUnread = true;
+      } else if (lastMessageAt != null && lastMessageAt.toDate().isAfter(myLastSeen.toDate())) {
+        isUnread = true;
+      }
+    }
+
+    return FutureBuilder<List<DocumentSnapshot>>(
+      future: Future.wait([
+        FirebaseFirestore.instance.collection("users").doc(otherUserId).get(),
+        FirebaseFirestore.instance.collection("food_items").doc(postId).get(),
+      ]),
+      builder: (context, snapshot) {
+        String displayName = "Loading...";
+        String postTitle = "Loading...";
+        String? avatarLetter;
+
+        if (snapshot.hasData) {
+          final userSnap = snapshot.data![0];
+          final foodSnap = snapshot.data![1];
+
+          if (userSnap.exists) {
+            final userData = userSnap.data() as Map<String, dynamic>?;
+            displayName = userData?['username'] ?? userData?['email'] ?? "User";
+            if (displayName.isNotEmpty) {
+              avatarLetter = displayName[0].toUpperCase();
+            }
+          }
+
+          if (foodSnap.exists) {
+            final foodData = foodSnap.data() as Map<String, dynamic>?;
+            postTitle = foodData?['name'] ?? "Unnamed Post";
+          } else {
+            postTitle = "Deleted Post";
+          }
+        }
+
         return ListTile(
           leading: CircleAvatar(
-            backgroundColor: colorScheme.outlineVariant,
-            child: Icon(Icons.person, color: colorScheme.onSurface),
-          ),
-          title: Text(
-            chat['name'] as String,
-            style: TextStyle(
-              fontWeight: chat['unread'] as bool
-                  ? FontWeight.bold
-                  : FontWeight.normal,
+            backgroundColor: isUnread ? colorScheme.primaryContainer : colorScheme.outlineVariant,
+            child: Text(
+              avatarLetter ?? "?",
+              style: TextStyle(
+                color: isUnread ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
-          subtitle: Text(
-            chat['lastMsg'] as String,
+          title: Text(
+            "$displayName : $postTitle",
+            style: TextStyle(
+              fontWeight: isUnread ? FontWeight.bold : FontWeight.normal,
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: Text(
+            lastMessage,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontWeight: isUnread ? FontWeight.w600 : FontWeight.normal,
+              color: isUnread ? Colors.black87 : Colors.grey.shade600,
+            ),
           ),
           trailing: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                chat['time'] as String,
-                style: Theme.of(context).textTheme.bodySmall,
+                _formatTime(lastMessageAt),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isUnread ? colorScheme.primary : Colors.grey.shade600,
+                  fontWeight: isUnread ? FontWeight.bold : FontWeight.normal,
+                ),
               ),
-              const SizedBox(height: 4),
-              if (chat['unread'] as bool)
-                CircleAvatar(radius: 4, backgroundColor: colorScheme.primary),
+              const SizedBox(height: 6),
+              if (isUnread)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Text(
+                    "New",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
             ],
           ),
           onTap: () {
-            // Navigate to actual chat room screen
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ChatScreen(chatId: chatId),
+              ),
+            );
           },
         );
       },
     );
+  }
+
+  String _formatTime(Timestamp? timestamp) {
+    if (timestamp == null) return "";
+    final date = timestamp.toDate();
+    final diff = DateTime.now().difference(date);
+    if (diff.inMinutes < 1) {
+      return "Just now";
+    } else if (diff.inMinutes < 60) {
+      return "${diff.inMinutes}m ago";
+    } else if (diff.inHours < 24) {
+      return "${diff.inHours}h ago";
+    } else if (diff.inDays < 7) {
+      return "${diff.inDays}d ago";
+    } else {
+      return DateFormat("MMM d").format(date);
+    }
   }
 }
