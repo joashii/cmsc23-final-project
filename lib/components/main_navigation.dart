@@ -15,10 +15,10 @@ class _MainNavState extends State<MainNav> {
 
   // The pages for each tab
   final List<Widget> _pages = [
-    const FoodFeedPage(), // Index 0
-    const SizedBox.shrink(), // Index 1 (Placeholder for the "Add" button)
-    const NotificationsPage(), // Index 2
-    const ProfilePage(), // Index 3
+    const FoodFeedPage(),
+    const SizedBox.shrink(),
+    const NotificationsPage(),
+    const ProfilePage(),
   ];
 
   void _onItemTapped(int index) {

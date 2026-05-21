@@ -3,9 +3,11 @@ import 'package:camera/camera.dart';
 import 'package:elbeats/provider/auth.provider.dart';
 import 'package:flutter/material.dart';
 // import 'package:image_picker/image_picker.dart';
-import 'package:elbeats/screens/feed.dart';
+import 'package:elbeats/components/main_navigation.dart';
 import 'package:elbeats/components/selfie_verification.dart';
 import 'package:provider/provider.dart';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class IdentityVerificationScreen extends StatefulWidget {
   const IdentityVerificationScreen({super.key});
@@ -66,7 +68,7 @@ class _IdentityVerificationScreenState
               const SizedBox(height: 32),
               ElevatedButton.icon(
                 onPressed: () async {
-                  // 1. Wait for the user to finish in the camera screen
+                  // Wait for the user to finish in the camera screen
                   final XFile? result = await Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -74,7 +76,7 @@ class _IdentityVerificationScreenState
                     ),
                   );
 
-                  // 2. If we got an image back, update the state
+                  // If we got an image back, update the state
                   if (result != null) {
                     setState(() {
                       _image = File(result.path);
@@ -88,19 +90,37 @@ class _IdentityVerificationScreenState
               FilledButton(
                 onPressed: _image == null
                     ? null
-                    : () {
-                        // Finish and go to Feed (where the Notification Modal will trigger)
-                        Provider.of<UserAuthProvider>(
+                    : () async {
+                        final user = Provider.of<UserAuthProvider>(
                           context,
                           listen: false,
-                        ).setNewRegistration(true);
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const FoodFeedPage(),
-                          ),
-                          (route) => false, // Clears navigation stack
-                        );
+                        ).currentUser;
+
+                        // Save authenticated user's profile data to Firestore
+                        // Uses Firebase Auth UID as document ID for easier lookup
+                        try {
+                          if (user != null) {
+                            await FirebaseFirestore.instance
+                                .collection("users")
+                                .doc(user.uid)
+                                .update({
+                                  "verified": true,
+                                  "isOnboardingComplete": true,
+                                });
+                          }
+
+                          // Simply pop back to the very first route (AuthWrapper)
+                          if (context.mounted) {
+                            Navigator.popUntil(
+                              context,
+                              (route) => route.isFirst,
+                            );
+                          }
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("Registration failed: $e")),
+                          );
+                        }
                       },
                 child: const Text("Finalize Registration"),
               ),

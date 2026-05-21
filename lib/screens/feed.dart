@@ -1,8 +1,13 @@
-import 'package:flutter/material.dart';
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../api/pantry.api.dart';
 import '../provider/auth.provider.dart';
+import 'food_details_page.dart';
 
 class FoodFeedPage extends StatefulWidget {
   const FoodFeedPage({super.key});
@@ -13,161 +18,307 @@ class FoodFeedPage extends StatefulWidget {
 
 class _FoodFeedPageState extends State<FoodFeedPage> {
   @override
-  void initState() {
-    super.initState();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: null,
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final auth = context.read<UserAuthProvider>();
-      if (auth.isNewRegistration) {
-        _showNotificationModal();
-        auth.setNewRegistration(false);
-      }
-    });
-  }
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(),
+                const SizedBox(height: 20),
 
-  void _showNotificationModal() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        icon: Icon(
-          Icons.notifications_active,
-          color: Theme.of(context).colorScheme.primary,
-          size: 40,
-        ),
-        title: const Text("Stay Updated"),
-        content: const Text(
-          "Would you like to receive alerts when new food is shared in your area? "
-          "You can change this anytime in settings.",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Maybe Later"),
+                _buildSearchBar(),
+                const SizedBox(height: 20),
+
+                _buildCategoryChips(),
+                const SizedBox(height: 20),
+
+                _buildRecipeSection(),
+                const SizedBox(height: 20),
+
+                _buildCommunitySection(),
+              ],
+            ),
           ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Notifications Enabled!")),
-              );
-            },
-            child: const Text("Enable"),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Community Pantry")),
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            const DrawerHeader(
-              decoration: BoxDecoration(color: Colors.green),
-              child: Text(
-                'Elbeats Menu',
-                style: TextStyle(color: Colors.white, fontSize: 24),
-              ),
+  Widget _buildHeader() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Text(
+              "SEARCHING FROM",
+              style: TextStyle(color: Colors.grey, fontSize: 12),
             ),
-            ListTile(
-              leading: const Icon(Icons.person),
-              title: const Text('View & Edit Profile'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/profile');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text('Logout'),
-              onTap: () {
-                context.read<UserAuthProvider>().signOut();
-              },
+            Text(
+              "Los Banos, Laguna",
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
           ],
         ),
+        IconButton(onPressed: () {}, icon: const Icon(Icons.favorite_border)),
+      ],
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return TextField(
+      decoration: InputDecoration(
+        hintText: "Craving anything?",
+        prefixIcon: const Icon(Icons.search),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
       ),
-      body: StreamBuilder(
-        stream: FirebasePantryAPI().getAllItems(),
-        builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
-          if (snapshot.hasError) {
-            // PRO-TIP: Printing the actual error to your terminal console
-            // stops you from guessing why the stream failed.
-            debugPrint("Firestore Stream Error: ${snapshot.error}");
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text("Error loading feed: ${snapshot.error}"),
-              ),
-            );
-          }
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+    );
+  }
 
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text("No food items listed yet!"));
-          }
+  Widget _buildCategoryChips() {
+    final categories = [
+      "Fruits & Vegetables",
+      "Cooked Meals",
+      "Baked Goods",
+      "Canned & Pantry",
+      "Dairy & Eggs",
+    ];
 
-          return ListView.builder(
-            itemCount: snapshot.data!.docs.length,
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: categories.map((category) {
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Chip(
+              label: Text(category, style: const TextStyle(fontSize: 13)),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildRecipeSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Based on Today's Pantry",
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+
+        const SizedBox(height: 10),
+
+        SizedBox(
+          height: 210,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: 4,
             itemBuilder: (context, index) {
-              Map<String, dynamic> data =
-                  snapshot.data!.docs[index].data() as Map<String, dynamic>;
-
-              // ─── NULL-SAFE PARSING FOR TIMESTAMPS ───
-              Timestamp? expiryTimestamp = data['expirationDate'] as Timestamp?;
-              DateTime expiryDate = expiryTimestamp != null
-                  ? expiryTimestamp.toDate()
-                  : DateTime.now().add(
-                      const Duration(days: 3),
-                    ); // 3-day fallback
-
-              String formattedDate =
-                  "${expiryDate.year}-${expiryDate.month}-${expiryDate.day}";
-
-              // ─── DEFENSIVE BACKUPS FOR OTHER FIELDS ───
-              String itemName = data['name'] ?? 'Unnamed Item';
-              var quantity = data['quantity'] ?? 1;
-              String itemStatus = data['status'] ?? 'Available';
-
-              return ListTile(
-                title: Text(itemName),
-                subtitle: Text("Qty: $quantity | Expires: $formattedDate"),
-                trailing: itemStatus == 'Available'
-                    ? ElevatedButton(
-                        onPressed: () async {
-                          String docId = snapshot.data!.docs[index].id;
-                          await FirebasePantryAPI().updateItemStatus(
-                            docId,
-                            "Reserved",
-                          );
-                        },
-                        child: const Text("Request"),
-                      )
-                    : const Text(
-                        "Reserved",
-                        style: TextStyle(color: Colors.orange),
-                      ),
-                onLongPress: () async {
-                  String docId = snapshot.data!.docs[index].id;
-                  await FirebasePantryAPI().deleteFoodItem(docId);
-                },
+              return Container(
+                width: 140,
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade100,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Center(child: Text("Recipe ${index + 1}")),
               );
             },
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        child: const Icon(Icons.add),
-        onPressed: () => Navigator.pushNamed(context, '/post-item'),
-      ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCommunitySection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "What the Community has to offer",
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+
+        const SizedBox(height: 12),
+
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebasePantryAPI().getAvailableItems(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Text("Error: ${snapshot.error}");
+            }
+
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (snapshot.data!.docs.isEmpty) {
+              return const Text("No food items available.");
+            }
+
+            return Column(
+              children: snapshot.data!.docs.map((doc) {
+                Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+
+                final currentUserId =
+                    FirebaseAuth.instance.currentUser?.uid ?? "";
+
+                final ownerId = data['ownerId'] ?? "";
+                final bool isOwner = currentUserId == ownerId;
+
+                String itemName = data['name'] ?? "Unnamed Item";
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            FoodDetailsPage(docId: doc.id, foodData: data),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    height: 180,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 5,
+                          spreadRadius: 1,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 6,
+                          child: ClipRRect(
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(20),
+                              bottomLeft: Radius.circular(20),
+                            ),
+                            child: data["imageBase64"] != null
+                                ? Image.memory(
+                                    base64Decode(data["imageBase64"]),
+                                    fit: BoxFit.cover,
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                  )
+                                : Container(
+                                    color: Colors.grey.shade300,
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.fastfood,
+                                        size: 50,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                        ),
+
+                        Expanded(
+                          flex: 4,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  data['postType'] ?? "PANTRY ITEM",
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+
+                                const SizedBox(height: 8),
+
+                                Text(
+                                  itemName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+
+                                const SizedBox(height: 4),
+
+                                Text(
+                                  data['category'] ?? "No category",
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+
+                                const SizedBox(height: 4),
+
+                                Text(
+                                  data['ownerName'] ?? "Anonymous User",
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                ),
+
+                                const SizedBox(height: 4),
+
+                                Text(
+                                  "2.3 km away",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.green,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+
+                                const Spacer(),
+
+                                if (isOwner)
+                                  const Text(
+                                    "Your Post",
+                                    style: TextStyle(
+                                      color: Colors.blue,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                else
+                                  const Text(
+                                    "View details",
+                                    style: TextStyle(
+                                      color: Colors.green,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            );
+          },
+        ),
+      ],
     );
   }
 }

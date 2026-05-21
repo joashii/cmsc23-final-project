@@ -18,7 +18,9 @@ class _PostItemPageState extends State<PostItemPage> {
 
   // Capture photo via camera
   Future<void> _pickImage() async {
-    final XFile? image = await ImagePicker().pickImage(source: ImageSource.camera);
+    final XFile? image = await ImagePicker().pickImage(
+      source: ImageSource.camera,
+    );
     if (image != null) setState(() => _image = File(image.path));
   }
 
@@ -47,18 +49,31 @@ class _PostItemPageState extends State<PostItemPage> {
               icon: const Icon(Icons.camera_alt),
               label: const Text("Take Required Photo"),
             ),
-            TextField(controller: nameController, decoration: const InputDecoration(labelText: "Item Name")),
-            TextField(controller: qtyController, decoration: const InputDecoration(labelText: "Quantity"), keyboardType: TextInputType.number),
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: "Item Name"),
+            ),
+            TextField(
+              controller: qtyController,
+              decoration: const InputDecoration(labelText: "Quantity"),
+              keyboardType: TextInputType.number,
+            ),
             ListTile(
-              title: Text(_selectedDate == null ? "Select Expiration Date" : "Expires: ${_selectedDate.toString().split(' ')[0]}"),
+              title: Text(
+                _selectedDate == null
+                    ? "Select Expiration Date"
+                    : "Expires: ${_selectedDate.toString().split(' ')[0]}",
+              ),
               trailing: const Icon(Icons.calendar_today),
               onTap: _pickDate,
             ),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () async {
-                if (nameController.text.isNotEmpty && _image != null && _selectedDate != null) {
-                   final newItem = FoodItem(
+                if (nameController.text.isNotEmpty &&
+                    _image != null &&
+                    _selectedDate != null) {
+                  final newItem = FoodItem(
                     name: nameController.text,
                     quantity: int.parse(qtyController.text),
                     expirationDate: _selectedDate!,
@@ -69,7 +84,7 @@ class _PostItemPageState extends State<PostItemPage> {
                 }
               },
               child: const Text("Post to Pantry"),
-            )
+            ),
           ],
         ),
       ),
