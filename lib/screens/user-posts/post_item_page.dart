@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:elbeats/api/notification.api.dart';
 
 class PostItemPage extends StatefulWidget {
   final String postType;
@@ -389,6 +390,8 @@ class _PostItemPageState extends State<PostItemPage> {
 
                         final ownerName =
                             userDoc.data()?['username'] ?? "Anonymous User";
+                        final ownerBarangay =
+                            userDoc.data()?['barangay'] ?? "";
 
                         final Map<String, dynamic> newFoodItem = {
                           'postType': widget.postType,
@@ -403,10 +406,21 @@ class _PostItemPageState extends State<PostItemPage> {
                           'imageBase64': base64Image,
                           'ownerId': user.uid,
                           'ownerName': ownerName,
+                          'barangay': ownerBarangay,
                           'requestedBy': [],
                         };
 
-                        await FirebasePantryAPI().addFoodItem(newFoodItem);
+                        final docRef = await FirebasePantryAPI().addFoodItem(newFoodItem);
+
+                        // Trigger nearby notifications asynchronously
+                        if (ownerBarangay.isNotEmpty) {
+                          FirebaseNotificationAPI.triggerNearbyNotifications(
+                            postID: docRef.id,
+                            postName: newFoodItem['name'],
+                            posterID: user.uid,
+                            posterBarangay: ownerBarangay,
+                          );
+                        }
 
                         if (context.mounted) {
                           Navigator.pop(context);

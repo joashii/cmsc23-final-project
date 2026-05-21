@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 class FirebasePantryAPI {
   static final FirebaseFirestore db = FirebaseFirestore.instance;
 
-  // Add a new food item
-  Future<void> addFoodItem(Map<String, dynamic> item) async {
-    await db.collection("food_items").add(item);
+  // Add a new food item and return the reference
+  Future<DocumentReference<Map<String, dynamic>>> addFoodItem(Map<String, dynamic> item) async {
+    return await db.collection("food_items").add(item);
   }
 
   // Update status of existing entry

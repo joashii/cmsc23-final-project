@@ -7,6 +7,7 @@ import 'package:elbeats/screens/qr/qr_scanner_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:elbeats/api/notification.api.dart';
 
 // ─── Data class to hold all parallel-loaded data ───────────────────────────
 class _RequestData {
@@ -296,6 +297,24 @@ class _RequestDetailsScreenState extends State<RequestDetailsScreen> {
                   chatId: chatId,
                   content: "Request accepted",
                 );
+
+                // Send notification to the requester
+                try {
+                  final claimSnap = await _firestore.collection("claims").doc(widget.claimId).get();
+                  final claimData = claimSnap.data() as Map<String, dynamic>?;
+                  final requesterId = claimData?["requesterID"] as String?;
+                  if (requesterId != null) {
+                    await FirebaseNotificationAPI.sendNotification(
+                      recipientID: requesterId,
+                      title: "Request Approved",
+                      body: "Your request for '${item["name"]}' was approved.",
+                      postID: widget.itemId,
+                      type: "request_approved",
+                    );
+                  }
+                } catch (e) {
+                  debugPrint("Error sending approval notification: $e");
+                }
 
                 // Reject other pending claims in parallel-friendly batch
                 final otherClaims = await _firestore
