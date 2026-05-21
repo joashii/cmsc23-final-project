@@ -516,9 +516,7 @@ class _RequestDetailsBody extends StatelessWidget {
           // ── Chat preview (own stream, only this widget rebuilds) ────────
           _ChatPreview(
             chatId: chatId,
-            messageController: messageController,
             formatDate: formatDate,
-            onSend: () => sendMessage(chatId),
           ),
 
           const SizedBox(height: 24),
@@ -592,7 +590,7 @@ class _DetailsCard extends StatelessWidget {
             ),
 
             Text(
-              "Request - $claimId",
+              "Request - ${item["name"] ?? "Unknown Item"}",
               style: const TextStyle(
                   fontSize: 16, fontWeight: FontWeight.bold),
             ),
@@ -625,28 +623,27 @@ class _DetailsCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        item["name"] ?? "Unknown Item",
+                        "Posted by ${item["ownerName"] ?? "Unknown"}",
                         style: const TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold),
+                            fontSize: 14, fontWeight: FontWeight.w500),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 2),
+                      Text(
+                        "Brgy. ${item["barangay"] ?? item["location"] ?? "Unknown"}",
+                        style: TextStyle(
+                            fontSize: 14, color: Colors.grey.shade600),
+                      ),
+                      const SizedBox(height: 8),
                       Text(
                         item["description"] ?? "",
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: Colors.grey.shade700),
+                        style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
                       ),
                     ],
                   ),
                 ),
               ],
-            ),
-
-            const SizedBox(height: 10),
-
-            Text(
-              "Posted by: ${item["ownerName"] ?? "Unknown"}",
-              style: const TextStyle(fontWeight: FontWeight.w500),
             ),
 
             const SizedBox(height: 12),
@@ -700,15 +697,11 @@ class _DetailsCard extends StatelessWidget {
 // ─── Chat preview with its own isolated stream ───────────────────────────────
 class _ChatPreview extends StatelessWidget {
   final String chatId;
-  final TextEditingController messageController;
   final String Function(dynamic) formatDate;
-  final VoidCallback onSend;
 
   const _ChatPreview({
     required this.chatId,
-    required this.messageController,
     required this.formatDate,
-    required this.onSend,
   });
 
   @override
@@ -723,98 +716,131 @@ class _ChatPreview extends StatelessWidget {
       builder: (context, chatSnap) {
         if (!chatSnap.hasData) return const SizedBox.shrink();
 
-        final chat = chatSnap.data!.data() as Map<String, dynamic>;
+        final chat = chatSnap.data!.data() as Map<String, dynamic>?;
+        if (chat == null) return const SizedBox.shrink();
 
-        // Get current user's lastSeen timestamp
-        final lastSeenMap = (chat["lastSeen"] as Map<String, dynamic>?) ?? {};
-        final lastSeen = currentUserId != null
-            ? lastSeenMap[currentUserId] as Timestamp?
-            : null;
+        final lastMessage = chat["lastMessage"] as String?;
+        final lastMessageAt = chat["lastMessageAt"];
+        final lastMessageSenderID = chat["lastMessageSenderID"] as String?;
 
-        return Column(
-          children: [
-            // Unread count via a nested StreamBuilder
-            StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection("chats")
-                  .doc(chatId)
-                  .collection("messages")
-                  .where("sentAt", isGreaterThan: lastSeen ?? Timestamp(0, 0)) // ← only one inequality
-                  .snapshots(),
-              builder: (context, msgSnap) {
-                // Filter out own messages client-side
-                final unreadCount = msgSnap.data?.docs.where((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  return data["senderID"] != currentUserId;
-                }).length ?? 0;
-
-                return InkWell(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => ChatScreen(chatId: chatId)),
-                  ),
-                  child: Card(
-                    margin: const EdgeInsets.all(8),
-                    child: ListTile(
-                      title: Text(chat["lastMessage"] ?? "No messages yet"),
-                      subtitle: Text(
-                        chat["lastMessageAt"] != null
-                            ? formatDate(chat["lastMessageAt"])
-                            : "",
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (unreadCount > 0)
-                            Container(
-                              margin: const EdgeInsets.only(right: 8),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.primary,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                unreadCount > 99 ? "99+" : "$unreadCount",
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          const Icon(Icons.chat_bubble_outline),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-
-            // Quick reply input
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Row(
+        if (lastMessageSenderID == null) {
+          return Card(
+            elevation: 2,
+            margin: const EdgeInsets.symmetric(vertical: 8),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
                 children: [
-                  Expanded(
-                    child: TextField(
-                      controller: messageController,
-                      decoration: const InputDecoration(
-                        hintText: "Reply...",
-                        border: OutlineInputBorder(),
-                      ),
+                  const Text(
+                    "No messages yet",
+                    style: TextStyle(
+                      fontStyle: FontStyle.italic,
+                      color: Colors.grey,
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.send),
-                    onPressed: onSend,
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        "Open Request Chat",
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ChatScreen(chatId: chatId),
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
-          ],
+          );
+        }
+
+        return FutureBuilder<DocumentSnapshot>(
+          future: FirebaseFirestore.instance
+              .collection("users")
+              .doc(lastMessageSenderID)
+              .get(),
+          builder: (context, userSnap) {
+            String senderName = "Loading...";
+            if (userSnap.hasData && userSnap.data!.exists) {
+              final userData = userSnap.data!.data() as Map<String, dynamic>?;
+              senderName = userData?['username'] ?? userData?['email'] ?? "User";
+            }
+
+            return Card(
+              elevation: 2,
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "$senderName sent:",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: Colors.black54,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      lastMessage ?? "",
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      lastMessageAt != null ? formatDate(lastMessageAt) : "",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text(
+                          "Open Request Chat",
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ChatScreen(chatId: chatId),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
