@@ -18,6 +18,9 @@ class FoodFeedPage extends StatefulWidget {
 }
 
 class _FoodFeedPageState extends State<FoodFeedPage> {
+  bool _showRelevantOnly = false;
+  bool _sortAscending = true;
+
   Color _getCategoryBgColor(String category) {
     switch (category) {
       case 'Fruits & Vegetables':
@@ -70,6 +73,7 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
         final userData = userSnapshot.data?.data() as Map<String, dynamic>?;
         final currentUserBarangay = userData?['barangay'] as String?;
         final currentUserRadius = (userData?['radius'] as num?)?.toDouble() ?? 2.0;
+        final userInterests = List<String>.from(userData?['interests'] ?? []);
 
         return Scaffold(
           appBar: null,
@@ -92,7 +96,7 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
                     _buildRecipeSection(),
                     const SizedBox(height: 20),
 
-                    _buildCommunitySection(currentUserBarangay, currentUserRadius),
+                    _buildCommunitySection(currentUserBarangay, currentUserRadius, userInterests),
                   ],
                 ),
               ),
@@ -192,7 +196,112 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
     );
   }
 
-  Widget _buildCommunitySection(String? currentUserBarangay, double currentUserRadius) {
+  Widget _buildFilterAndSortRow() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Filter: Show All vs Show Relevant ChoiceChips
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _showRelevantOnly = false;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: !_showRelevantOnly ? Colors.green : Colors.transparent,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: !_showRelevantOnly ? Colors.green : Colors.grey.shade400,
+                    ),
+                  ),
+                  child: Text(
+                    "All Posts",
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: !_showRelevantOnly ? Colors.white : Colors.grey.shade700,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _showRelevantOnly = true;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _showRelevantOnly ? Colors.green : Colors.transparent,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: _showRelevantOnly ? Colors.green : Colors.grey.shade400,
+                    ),
+                  ),
+                  child: Text(
+                    "Relevant",
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: _showRelevantOnly ? Colors.white : Colors.grey.shade700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // Sort: Nearest vs Furthest First
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _sortAscending = !_sortAscending;
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: Colors.green.shade200,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _sortAscending ? Icons.south : Icons.north,
+                    size: 14,
+                    color: Colors.green.shade800,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _sortAscending ? "Nearest First" : "Furthest First",
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green.shade800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCommunitySection(String? currentUserBarangay, double currentUserRadius, List<String> userInterests) {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? "";
 
     return Column(
@@ -205,6 +314,10 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
 
         const SizedBox(height: 12),
 
+        _buildFilterAndSortRow(),
+
+        const SizedBox(height: 8),
+
         StreamBuilder<QuerySnapshot>(
           stream: FirebasePantryAPI().getAvailableItems(),
           builder: (context, snapshot) {
@@ -216,11 +329,12 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
               return const Center(child: CircularProgressIndicator());
             }
 
-            // Filter items synchronously by radius
-            final docs = snapshot.data!.docs.where((doc) {
+            // Filter items synchronously by radius & interests
+            List<QueryDocumentSnapshot> docs = snapshot.data!.docs.where((doc) {
               final data = doc.data() as Map<String, dynamic>;
               final ownerId = data['ownerId'] ?? "";
               final posterBarangay = data['barangay'] as String? ?? "";
+              final category = data['category'] as String? ?? "";
 
               // Show poster's own post regardless of distance
               if (ownerId == currentUserId) return true;
@@ -228,11 +342,63 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
               if (posterBarangay.isEmpty || currentUserBarangay == null) return false;
 
               final distance = FirebaseNotificationAPI.calculateDistance(currentUserBarangay, posterBarangay);
-              return distance <= currentUserRadius;
+              if (distance > currentUserRadius) return false;
+
+              // Relevance filter if toggled
+              if (_showRelevantOnly) {
+                if (!userInterests.contains(category)) {
+                  return false;
+                }
+              }
+
+              return true;
             }).toList();
 
+            // Sort by distance dynamically
+            docs.sort((a, b) {
+              final dataA = a.data() as Map<String, dynamic>;
+              final dataB = b.data() as Map<String, dynamic>;
+
+              final ownerIdA = dataA['ownerId'] ?? "";
+              final ownerIdB = dataB['ownerId'] ?? "";
+
+              final barangayA = dataA['barangay'] as String? ?? "";
+              final barangayB = dataB['barangay'] as String? ?? "";
+
+              double distA = 0.0;
+              if (ownerIdA != currentUserId && currentUserBarangay != null && barangayA.isNotEmpty) {
+                distA = FirebaseNotificationAPI.calculateDistance(currentUserBarangay, barangayA);
+              }
+
+              double distB = 0.0;
+              if (ownerIdB != currentUserId && currentUserBarangay != null && barangayB.isNotEmpty) {
+                distB = FirebaseNotificationAPI.calculateDistance(currentUserBarangay, barangayB);
+              }
+
+              if (_sortAscending) {
+                return distA.compareTo(distB);
+              } else {
+                return distB.compareTo(distA);
+              }
+            });
+
             if (docs.isEmpty) {
-              return const Text("No food items available within your radius.");
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 32),
+                  child: Text(
+                    _showRelevantOnly
+                        ? "No relevant posts matching your interests within your radius."
+                        : "No food items available within your radius.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 14,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              );
             }
 
             return Column(
