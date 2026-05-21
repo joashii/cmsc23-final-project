@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:elbeats/screens/account-creation/profile_setup.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
+import 'package:elbeats/provider/auth.provider.dart';
 
 class InterestTagsScreen extends StatefulWidget {
   const InterestTagsScreen({super.key});
@@ -9,16 +12,12 @@ class InterestTagsScreen extends StatefulWidget {
 }
 
 class _InterestTagsScreenState extends State<InterestTagsScreen> {
-  // Typical food categories for a sharing app
   final List<String> _categories = [
-    'Vegan',
-    'Homecooked',
-    'Vegetables',
-    'Fruits',
-    'Canned Items',
-    'Snacks',
-    'Dairy and Eggs',
-    'Halal',
+    'Fruits & Vegetables',
+    'Cooked Meals',
+    'Baked Goods',
+    'Canned & Pantry',
+    'Dairy & Eggs',
   ];
 
   final Set<String> _selectedTags = {};
@@ -56,6 +55,7 @@ class _InterestTagsScreenState extends State<InterestTagsScreen> {
                 return FilterChip(
                   label: Text(category),
                   selected: isSelected,
+                  showCheckmark: false, // Prevents layout shifting when checked
                   onSelected: (bool selected) {
                     setState(() {
                       if (selected) {
@@ -86,20 +86,37 @@ class _InterestTagsScreenState extends State<InterestTagsScreen> {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                // 1. Logic to disable the button if no tags are selected
+                // Disable the button if no tags are selected
                 onPressed: _selectedTags.isEmpty
                     ? null
-                    : () {
-                        // 2. Optional: Save the data to your Provider before navigating
-                        // context.read<UserAuthProvider>().setInterests(_selectedTags.toList());
-
-                        // 3. Navigate to the Role & Location screen
-                        Navigator.push(
+                    : () async {
+                        final user = Provider.of<UserAuthProvider>(
                           context,
-                          MaterialPageRoute(
-                            builder: (context) => const ProfileSetupScreen(),
-                          ),
-                        );
+                          listen: false,
+                        ).currentUser;
+
+                        if (user != null) {
+                          try {
+                            await FirebaseFirestore.instance
+                                .collection("users")
+                                .doc(user.uid)
+                                .update({
+                              "interests": _selectedTags.toList(),
+                            });
+                          } catch (e) {
+                            debugPrint("Error saving interests: $e");
+                          }
+                        }
+
+                        if (context.mounted) {
+                          // Navigate to the Role & Location screen
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ProfileSetupScreen(),
+                            ),
+                          );
+                        }
                       },
                 child: const Text("Continue"),
               ),

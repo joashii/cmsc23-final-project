@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:elbeats/screens/account-creation/identity_verification.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
+import 'package:elbeats/provider/auth.provider.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
   const ProfileSetupScreen({super.key});
@@ -105,13 +108,35 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               child: FilledButton(
                 onPressed: _selectedBarangay == null
                     ? null
-                    : () {
-                        Navigator.push(
+                    : () async {
+                        final user = Provider.of<UserAuthProvider>(
                           context,
-                          MaterialPageRoute(
-                            builder: (_) => const IdentityVerificationScreen(),
-                          ),
-                        );
+                          listen: false,
+                        ).currentUser;
+
+                        if (user != null) {
+                          try {
+                            await FirebaseFirestore.instance
+                                .collection("users")
+                                .doc(user.uid)
+                                .update({
+                              "barangay": _selectedBarangay,
+                              "radius": _radius,
+                              "role": _role.first,
+                            });
+                          } catch (e) {
+                            debugPrint("Error saving profile: $e");
+                          }
+                        }
+
+                        if (context.mounted) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const IdentityVerificationScreen(),
+                            ),
+                          );
+                        }
                       },
                 child: const Text("Continue"),
               ),

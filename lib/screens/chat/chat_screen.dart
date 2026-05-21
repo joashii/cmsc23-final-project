@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:elbeats/screens/request-item/request_item_details_screen.dart';
 
 const _kReactions = ['❤️', '😂', '😮', '😢', '👍', '👎'];
 
@@ -312,7 +313,42 @@ class _ChatScreenState extends State<ChatScreen> {
     final bubbleMaxWidth = MediaQuery.of(context).size.width * 0.72;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Chat")),
+      appBar: AppBar(
+        title: const Text("Chat"),
+        actions: [
+          FutureBuilder<QuerySnapshot>(
+            future: FirebaseFirestore.instance
+                .collection("claims")
+                .where("chatID", isEqualTo: widget.chatId)
+                .limit(1)
+                .get(),
+            builder: (context, snapshot) {
+              if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+                final claimDoc = snapshot.data!.docs.first;
+                final claimId = claimDoc.id;
+                final itemId = claimDoc['itemID'] ?? "";
+
+                return IconButton(
+                  icon: const Icon(Icons.info_outline),
+                  tooltip: "Request Details",
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => RequestDetailsScreen(
+                          claimId: claimId,
+                          itemId: itemId,
+                        ),
+                      ),
+                    );
+                  },
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
+        ],
+      ),
       resizeToAvoidBottomInset: true,
       body: Column(
         children: [

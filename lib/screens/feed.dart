@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../api/pantry.api.dart';
 import '../provider/auth.provider.dart';
 import 'food_details_page.dart';
+import '../api/notification.api.dart';
 
 class FoodFeedPage extends StatefulWidget {
   const FoodFeedPage({super.key});
@@ -17,36 +18,92 @@ class FoodFeedPage extends StatefulWidget {
 }
 
 class _FoodFeedPageState extends State<FoodFeedPage> {
+  bool _showRelevantOnly = false;
+  bool _sortAscending = true;
+
+  Color _getCategoryBgColor(String category) {
+    switch (category) {
+      case 'Fruits & Vegetables':
+        return Colors.green.shade50;
+      case 'Cooked Meals':
+        return Colors.orange.shade50;
+      case 'Baked Goods':
+        return Colors.amber.shade50;
+      case 'Canned & Pantry':
+        return Colors.blue.shade50;
+      case 'Dairy & Eggs':
+        return Colors.yellow.shade50;
+      default:
+        return Colors.grey.shade100;
+    }
+  }
+
+  Color _getCategoryTextColor(String category) {
+    switch (category) {
+      case 'Fruits & Vegetables':
+        return Colors.green.shade800;
+      case 'Cooked Meals':
+        return Colors.orange.shade900;
+      case 'Baked Goods':
+        return Colors.amber.shade900;
+      case 'Canned & Pantry':
+        return Colors.blue.shade800;
+      case 'Dairy & Eggs':
+        return Colors.yellow.shade900;
+      default:
+        return Colors.grey.shade800;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: null,
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? "";
 
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(),
-                const SizedBox(height: 20),
+    return FutureBuilder<DocumentSnapshot>(
+      future: FirebaseFirestore.instance.collection("users").doc(currentUserId).get(),
+      builder: (context, userSnapshot) {
+        if (userSnapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
 
-                _buildSearchBar(),
-                const SizedBox(height: 20),
+        final userData = userSnapshot.data?.data() as Map<String, dynamic>?;
+        final currentUserBarangay = userData?['barangay'] as String?;
+        final currentUserRadius = (userData?['radius'] as num?)?.toDouble() ?? 2.0;
+        final userInterests = List<String>.from(userData?['interests'] ?? []);
 
-                _buildCategoryChips(),
-                const SizedBox(height: 20),
+        return Scaffold(
+          appBar: null,
+          body: SafeArea(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(),
+                    const SizedBox(height: 20),
 
-                _buildRecipeSection(),
-                const SizedBox(height: 20),
+                    _buildSearchBar(),
+                    const SizedBox(height: 20),
 
-                _buildCommunitySection(),
-              ],
+                    _buildCategoryChips(),
+                    const SizedBox(height: 20),
+
+                    _buildRecipeSection(),
+                    const SizedBox(height: 20),
+
+                    _buildCommunitySection(currentUserBarangay, currentUserRadius, userInterests),
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -139,7 +196,114 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
     );
   }
 
-  Widget _buildCommunitySection() {
+  Widget _buildFilterAndSortRow() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Filter: Show All vs Show Relevant ChoiceChips
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _showRelevantOnly = false;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: !_showRelevantOnly ? Colors.green : Colors.transparent,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: !_showRelevantOnly ? Colors.green : Colors.grey.shade400,
+                    ),
+                  ),
+                  child: Text(
+                    "All Posts",
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: !_showRelevantOnly ? Colors.white : Colors.grey.shade700,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _showRelevantOnly = true;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _showRelevantOnly ? Colors.green : Colors.transparent,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: _showRelevantOnly ? Colors.green : Colors.grey.shade400,
+                    ),
+                  ),
+                  child: Text(
+                    "Relevant",
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: _showRelevantOnly ? Colors.white : Colors.grey.shade700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // Sort: Nearest vs Furthest First
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _sortAscending = !_sortAscending;
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: Colors.green.shade200,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _sortAscending ? Icons.south : Icons.north,
+                    size: 14,
+                    color: Colors.green.shade800,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _sortAscending ? "Nearest First" : "Furthest First",
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green.shade800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCommunitySection(String? currentUserBarangay, double currentUserRadius, List<String> userInterests) {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? "";
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -149,6 +313,10 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
         ),
 
         const SizedBox(height: 12),
+
+        _buildFilterAndSortRow(),
+
+        const SizedBox(height: 8),
 
         StreamBuilder<QuerySnapshot>(
           stream: FirebasePantryAPI().getAvailableItems(),
@@ -161,21 +329,93 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
               return const Center(child: CircularProgressIndicator());
             }
 
-            if (snapshot.data!.docs.isEmpty) {
-              return const Text("No food items available.");
+            // Filter items synchronously by radius & interests
+            List<QueryDocumentSnapshot> docs = snapshot.data!.docs.where((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              final ownerId = data['ownerId'] ?? "";
+              final posterBarangay = data['barangay'] as String? ?? "";
+              final category = data['category'] as String? ?? "";
+
+              // Show poster's own post regardless of distance
+              if (ownerId == currentUserId) return true;
+
+              if (posterBarangay.isEmpty || currentUserBarangay == null) return false;
+
+              final distance = FirebaseNotificationAPI.calculateDistance(currentUserBarangay, posterBarangay);
+              if (distance > currentUserRadius) return false;
+
+              // Relevance filter if toggled
+              if (_showRelevantOnly) {
+                if (!userInterests.contains(category)) {
+                  return false;
+                }
+              }
+
+              return true;
+            }).toList();
+
+            // Sort by distance dynamically
+            docs.sort((a, b) {
+              final dataA = a.data() as Map<String, dynamic>;
+              final dataB = b.data() as Map<String, dynamic>;
+
+              final ownerIdA = dataA['ownerId'] ?? "";
+              final ownerIdB = dataB['ownerId'] ?? "";
+
+              final barangayA = dataA['barangay'] as String? ?? "";
+              final barangayB = dataB['barangay'] as String? ?? "";
+
+              double distA = 0.0;
+              if (ownerIdA != currentUserId && currentUserBarangay != null && barangayA.isNotEmpty) {
+                distA = FirebaseNotificationAPI.calculateDistance(currentUserBarangay, barangayA);
+              }
+
+              double distB = 0.0;
+              if (ownerIdB != currentUserId && currentUserBarangay != null && barangayB.isNotEmpty) {
+                distB = FirebaseNotificationAPI.calculateDistance(currentUserBarangay, barangayB);
+              }
+
+              if (_sortAscending) {
+                return distA.compareTo(distB);
+              } else {
+                return distB.compareTo(distA);
+              }
+            });
+
+            if (docs.isEmpty) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 32),
+                  child: Text(
+                    _showRelevantOnly
+                        ? "No relevant posts matching your interests within your radius."
+                        : "No food items available within your radius.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 14,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              );
             }
 
             return Column(
-              children: snapshot.data!.docs.map((doc) {
+              children: docs.map((doc) {
                 Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-
-                final currentUserId =
-                    FirebaseAuth.instance.currentUser?.uid ?? "";
 
                 final ownerId = data['ownerId'] ?? "";
                 final bool isOwner = currentUserId == ownerId;
+                final posterBarangay = data['barangay'] as String? ?? "";
 
                 String itemName = data['name'] ?? "Unnamed Item";
+
+                double distance = 0.0;
+                if (!isOwner && currentUserBarangay != null && posterBarangay.isNotEmpty) {
+                  distance = FirebaseNotificationAPI.calculateDistance(currentUserBarangay, posterBarangay);
+                }
+
                 return GestureDetector(
                   onTap: () {
                     Navigator.push(
@@ -204,7 +444,7 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
                     child: Row(
                       children: [
                         Expanded(
-                          flex: 6,
+                          flex: 4,
                           child: ClipRRect(
                             borderRadius: const BorderRadius.only(
                               topLeft: Radius.circular(20),
@@ -231,81 +471,115 @@ class _FoodFeedPageState extends State<FoodFeedPage> {
                         ),
 
                         Expanded(
-                          flex: 4,
+                          flex: 6,
                           child: Padding(
                             padding: const EdgeInsets.all(12),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  data['postType'] ?? "PANTRY ITEM",
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.grey.shade600,
+                                // Category tag / badge with color coding
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _getCategoryBgColor(
+                                      data['category'] ?? "Other",
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    data['category'] ?? "Other",
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: _getCategoryTextColor(
+                                        data['category'] ?? "Other",
+                                      ),
+                                    ),
                                   ),
                                 ),
 
-                                const SizedBox(height: 8),
+                                const Spacer(flex: 2),
 
+                                // Post Title
                                 Text(
                                   itemName,
-                                  maxLines: 1,
+                                  maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
+                                  softWrap: true,
                                   style: const TextStyle(
-                                    fontSize: 20,
+                                    fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
 
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 6),
 
-                                Text(
-                                  data['category'] ?? "No category",
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-
-                                const SizedBox(height: 4),
-
-                                Text(
-                                  data['ownerName'] ?? "Anonymous User",
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.grey.shade500,
-                                  ),
-                                ),
-
-                                const SizedBox(height: 4),
-
-                                Text(
-                                  "2.3 km away",
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.green,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-
-                                const Spacer(),
-
-                                if (isOwner)
-                                  const Text(
-                                    "Your Post",
-                                    style: TextStyle(
-                                      color: Colors.blue,
-                                      fontWeight: FontWeight.bold,
+                                // Poster Photo & Details 
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 16,
+                                      backgroundColor: Colors.green.shade100,
+                                      child: Text(
+                                        (data['ownerName'] as String? ?? "A")
+                                                .isNotEmpty
+                                            ? (data['ownerName'] as String)[0]
+                                                .toUpperCase()
+                                            : "A",
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.green.shade900,
+                                        ),
+                                      ),
                                     ),
-                                  )
-                                else
-                                  const Text(
-                                    "View details",
-                                    style: TextStyle(
-                                      color: Colors.green,
-                                      fontWeight: FontWeight.bold,
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            data['ownerName'] ?? "Anonymous User",
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          if (isOwner)
+                                            const Text(
+                                              "Your Post",
+                                              style: TextStyle(
+                                                color: Colors.blue,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 10,
+                                              ),
+                                            )
+                                          else if (posterBarangay.isNotEmpty)
+                                            Text(
+                                              "$posterBarangay (${distance.toStringAsFixed(1)} km away)",
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.green.shade700,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
+                                  ],
+                                ),
                               ],
                             ),
                           ),

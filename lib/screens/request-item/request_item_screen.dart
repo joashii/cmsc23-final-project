@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:elbeats/api/notification.api.dart';
 
 class RequestItemScreen extends StatefulWidget {
   final String itemID;
@@ -38,6 +39,11 @@ class _RequestItemScreenState extends State<RequestItemScreen> {
       final ownerId = widget.ownerID;
 
       final firestore = FirebaseFirestore.instance;
+
+      // Get item name first for the notification
+      final itemSnap = await getItem();
+      final itemData = itemSnap.data() as Map<String, dynamic>?;
+      final itemName = itemData?['name'] ?? 'Unnamed Item';
 
       // Create chat
       final chatRef = await firestore.collection("chats").add({
@@ -78,6 +84,24 @@ class _RequestItemScreenState extends State<RequestItemScreen> {
         "sentAt": FieldValue.serverTimestamp(),
         "senderID": requesterId,
       });
+
+      // Send notification to owner
+      await FirebaseNotificationAPI.sendNotification(
+        recipientID: ownerId,
+        title: "New Request Received",
+        body: "A user has sent a request for '$itemName'.",
+        postID: widget.itemID,
+        type: "request_received",
+      );
+
+      // Send notification to requester
+      await FirebaseNotificationAPI.sendNotification(
+        recipientID: requesterId,
+        title: "Request Sent",
+        body: "You have sent a request for '$itemName'.",
+        postID: widget.itemID,
+        type: "request_sent",
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

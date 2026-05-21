@@ -292,52 +292,61 @@ class _FoodDetailsPageState extends State<FoodDetailsPage> {
                             builder: (context, snapshot) {
                               final requested = snapshot.data?.docs.isNotEmpty ?? false;
 
-                              return requested
-                                  ? OutlinedButton(
-                                    style: OutlinedButton.styleFrom(
-                                      side: BorderSide(
-                                        color: AppColors.forestGreen,
-                                      ),
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 16,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(30),
-                                      ),
+                              if (requested) {
+                                final claimDoc = snapshot.data!.docs.first;
+                                final claimId = claimDoc.id;
+
+                                return ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue.shade600,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
                                     ),
-                                    onPressed: null,
-                                    child: Text(
-                                      "Request Sent",
-                                      style: TextStyle(
-                                        color: AppColors.forestGreen,
-                                      ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(30),
                                     ),
-                                  )
-                                  : ElevatedButton(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppColors.forestGreen,
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 16,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(30),
+                                  ),
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => RequestDetailsScreen(
+                                          claimId: claimId,
+                                          itemId: widget.docId,
                                         ),
                                       ),
-                                      onPressed: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => RequestItemScreen(
-                                              itemID: widget.docId,
-                                              ownerID: widget.foodData['ownerId'],
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                      child: const Text("Send Request"),
                                     );
                                   },
+                                  child: const Text("View Request Details"),
+                                );
+                              }
+
+                              return ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.forestGreen,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(30),
+                                    ),
+                                  ),
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => RequestItemScreen(
+                                          itemID: widget.docId,
+                                          ownerID: widget.foodData['ownerId'],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  child: const Text("Send Request"),
+                                );
+                            },
                                 )
                       ),
 
