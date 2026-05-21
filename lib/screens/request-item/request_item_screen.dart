@@ -94,6 +94,15 @@ class _RequestItemScreenState extends State<RequestItemScreen> {
         type: "request_received",
       );
 
+      // Send notification to requester
+      await FirebaseNotificationAPI.sendNotification(
+        recipientID: requesterId,
+        title: "Request Sent",
+        body: "You have sent a request for '$itemName'.",
+        postID: widget.itemID,
+        type: "request_sent",
+      );
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Request submitted")),

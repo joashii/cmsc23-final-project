@@ -133,12 +133,16 @@ class _NotificationsPageState extends State<NotificationsPage> {
                         ? Icons.receipt_long_outlined
                         : type == "request_approved"
                             ? Icons.check_circle_outline
-                            : Icons.location_on_outlined,
+                            : type == "request_sent"
+                                ? Icons.outbox_outlined
+                                : Icons.location_on_outlined,
                     color: type == "request_received"
                         ? Colors.orange
                         : type == "request_approved"
                             ? Colors.green
-                            : colorScheme.primary,
+                            : type == "request_sent"
+                                ? Colors.blue
+                                : colorScheme.primary,
                   ),
                 ),
                 title: Text(
