@@ -13,14 +13,11 @@ class InterestTagsScreen extends StatefulWidget {
 
 class _InterestTagsScreenState extends State<InterestTagsScreen> {
   final List<String> _categories = [
-    'Vegan',
-    'Homecooked',
-    'Vegetables',
-    'Fruits',
-    'Canned Items',
-    'Snacks',
-    'Dairy and Eggs',
-    'Halal',
+    'Fruits & Vegetables',
+    'Cooked Meals',
+    'Baked Goods',
+    'Canned & Pantry',
+    'Dairy & Eggs',
   ];
 
   final Set<String> _selectedTags = {};
@@ -58,6 +55,7 @@ class _InterestTagsScreenState extends State<InterestTagsScreen> {
                 return FilterChip(
                   label: Text(category),
                   selected: isSelected,
+                  showCheckmark: false, // Prevents layout shifting when checked
                   onSelected: (bool selected) {
                     setState(() {
                       if (selected) {
