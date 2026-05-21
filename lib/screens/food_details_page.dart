@@ -287,7 +287,7 @@ class _FoodDetailsPageState extends State<FoodDetailsPage> {
                                 .collection('claims')
                                 .where('itemID', isEqualTo: widget.docId)
                                 .where('requesterID', isEqualTo: currentUserId)
-                                .limit(1)
+                                .where('status', whereIn: ['pending', 'accepted'])
                                 .snapshots(),
                             builder: (context, snapshot) {
                               final requested = snapshot.data?.docs.isNotEmpty ?? false;
