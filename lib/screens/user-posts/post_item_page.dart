@@ -55,7 +55,6 @@ class _PostItemPageState extends State<PostItemPage> {
   Future<void> _pickImage(ImageSource source) async {
     final XFile? pickedFile = await _picker.pickImage(
       source: source,
-      imageQuality: 10,
       maxWidth: 500,
       maxHeight: 500,
     );

@@ -23,11 +23,13 @@ class RequestCard extends StatelessWidget {
   Color _statusColor(String status) {
     switch (status) {
       case "accepted":
-        return Colors.green;
+        return Colors.green.shade300;
       case "rejected":
         return Colors.red;
+      case "cancelled":
+        return Colors.red.withOpacity(0.5);
       default:
-        return Colors.orange;
+        return Colors.green;
     }
   }
 

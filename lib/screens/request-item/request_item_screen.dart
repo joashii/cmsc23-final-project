@@ -23,7 +23,6 @@ class _RequestItemScreenState extends State<RequestItemScreen> {
   Future<void> submitRequest() async {
     final message = _messageController.text.trim();
 
-    // ✅ Prevent empty message
     if (message.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please enter a message before sending.")),
@@ -34,16 +33,50 @@ class _RequestItemScreenState extends State<RequestItemScreen> {
     setState(() => isLoading = true);
 
     try {
-      final currentUser = FirebaseAuth.instance.currentUser;
+      final currentUser = FirebaseAuth.instance.currentUser!;
+      final requesterId = currentUser.uid;
+      final ownerId = widget.ownerID;
 
-      await FirebaseFirestore.instance.collection('claims').add({
+      final firestore = FirebaseFirestore.instance;
+
+      // Create chat
+      final chatRef = await firestore.collection("chats").add({
+        "participants": [requesterId, ownerId],
+        "postID": widget.itemID,
+        "createdAt": FieldValue.serverTimestamp(),
+        "lastMessage": message,
+        "lastMessageAt": FieldValue.serverTimestamp(),
+        "lastMessageSenderID": requesterId,
+        "lastSeen": {
+          requesterId: FieldValue.serverTimestamp(),
+          ownerId: null,
+        }
+      });
+
+      // Create claim
+      await firestore.collection('claims').add({
         "itemID": widget.itemID,
-        "message": message,
-        "ownerID": widget.ownerID,
+        "ownerID": ownerId,
         "qrVerified": false,
-        "requestedAt": Timestamp.now(),
-        "requesterID": currentUser!.uid,
+        "requestedAt": FieldValue.serverTimestamp(),
+        "requesterID": requesterId,
         "status": "pending",
+        "chatID": chatRef.id,
+      });
+
+      // Initialize Messages
+      await chatRef.collection("messages").add({
+        "type": "system",
+        "content": "Request sent",
+        "sentAt": FieldValue.serverTimestamp(),
+        "senderID": requesterId,
+      });
+
+      await chatRef.collection("messages").add({
+        "type": "text",
+        "content": message,
+        "sentAt": FieldValue.serverTimestamp(),
+        "senderID": requesterId,
       });
 
       if (mounted) {
