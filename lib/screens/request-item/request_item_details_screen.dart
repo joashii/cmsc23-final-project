@@ -694,6 +694,8 @@ class _ChatPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+
     return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance
           .collection("chats")
@@ -704,27 +706,72 @@ class _ChatPreview extends StatelessWidget {
 
         final chat = chatSnap.data!.data() as Map<String, dynamic>;
 
+        // Get current user's lastSeen timestamp
+        final lastSeenMap = (chat["lastSeen"] as Map<String, dynamic>?) ?? {};
+        final lastSeen = currentUserId != null
+            ? lastSeenMap[currentUserId] as Timestamp?
+            : null;
+
         return Column(
           children: [
-            // Chat link tile
-            InkWell(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => ChatScreen(chatId: chatId)),
-              ),
-              child: Card(
-                margin: const EdgeInsets.all(8),
-                child: ListTile(
-                  title: Text(chat["lastMessage"] ?? "No messages yet"),
-                  subtitle: Text(
-                    chat["lastMessageAt"] != null
-                        ? formatDate(chat["lastMessageAt"])
-                        : "",
+            // Unread count via a nested StreamBuilder
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection("chats")
+                  .doc(chatId)
+                  .collection("messages")
+                  .where("sentAt", isGreaterThan: lastSeen ?? Timestamp(0, 0)) // ← only one inequality
+                  .snapshots(),
+              builder: (context, msgSnap) {
+                // Filter out own messages client-side
+                final unreadCount = msgSnap.data?.docs.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  return data["senderID"] != currentUserId;
+                }).length ?? 0;
+
+                return InkWell(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => ChatScreen(chatId: chatId)),
                   ),
-                  trailing: const Icon(Icons.chat_bubble_outline),
-                ),
-              ),
+                  child: Card(
+                    margin: const EdgeInsets.all(8),
+                    child: ListTile(
+                      title: Text(chat["lastMessage"] ?? "No messages yet"),
+                      subtitle: Text(
+                        chat["lastMessageAt"] != null
+                            ? formatDate(chat["lastMessageAt"])
+                            : "",
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (unreadCount > 0)
+                            Container(
+                              margin: const EdgeInsets.only(right: 8),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.primary,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                unreadCount > 99 ? "99+" : "$unreadCount",
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          const Icon(Icons.chat_bubble_outline),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
 
             // Quick reply input
